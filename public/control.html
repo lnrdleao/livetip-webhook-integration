@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Pagamentos - LiveTip</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .control-header {
+            background: linear-gradient(135deg, #f7931a, #ffb347);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            border-radius: 10px;
+        }
+        
+        .stats-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            border-left: 4px solid #f7931a;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #f7931a;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .filters {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .filter-group label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .payments-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .table-header {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .payment-row {
+            padding: 1rem;
+            border-bottom: 1px solid #e9ecef;
+            transition: background-color 0.3s;
+        }
+        
+        .payment-row:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .payment-row.confirmed {
+            border-left: 4px solid #28a745;
+        }
+        
+        .payment-row.pending {
+            border-left: 4px solid #ffc107;
+        }
+        
+        .payment-row.failed {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .payment-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .payment-field {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .field-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 0.2rem;
+        }
+        
+        .field-value {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .status-badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .status-confirmed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .payment-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+        
+        .btn-action {
+            padding: 0.4rem 0.8rem;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-check {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-check:hover {
+            background: #0056b3;
+        }
+        
+        .btn-details {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-details:hover {
+            background: #545b62;
+        }
+        
+        .real-time-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #28a745;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            margin-right: 0.5rem;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .webhook-status {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .webhook-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .no-payments {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+        
+        .refresh-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .last-update {
+            font-size: 0.9rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="control-header">
+            <h1>📊 Controle de Pagamentos Bitcoin</h1>
+            <p>Monitoramento em tempo real com confirmação via webhook</p>
+            <div class="webhook-indicator">
+                <span class="real-time-indicator"></span>
+                <span>Sistema conectado e monitorando pagamentos</span>
+            </div>
+        </div>
+
+        <!-- Status do Webhook -->
+        <div class="webhook-status">
+            <h3>🔗 Status do Webhook</h3>
+            <div id="webhookStatus">
+                <p>⏳ Verificando conexão...</p>
+            </div>
+        </div>
+
+        <!-- Dashboard de Estatísticas -->
+        <div class="stats-dashboard" id="statsDashboard">
+            <div class="stat-card">
+                <div class="stat-number" id="totalPayments">0</div>
+                <div class="stat-label">Total de Pagamentos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="confirmedPayments">0</div>
+                <div class="stat-label">Confirmados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="pendingPayments">0</div>
+                <div class="stat-label">Pendentes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalSatoshis">0</div>
+                <div class="stat-label">Total Satoshis</div>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filters">
+            <h3>🔍 Filtros</h3>
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="statusFilter">Status:</label>
+                    <select id="statusFilter">
+                        <option value="all">Todos</option>
+                        <option value="pending">Pendentes</option>
+                        <option value="confirmed">Confirmados</option>
+                        <option value="failed">Falhados</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="dateFilter">Período:</label>
+                    <select id="dateFilter">
+                        <option value="all">Todos</option>
+                        <option value="today">Hoje</option>
+                        <option value="week">Esta Semana</option>
+                        <option value="month">Este Mês</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="searchFilter">Buscar:</label>
+                    <input type="text" id="searchFilter" placeholder="Nome ou ID único...">
+                </div>
+            </div>
+        </div>
+
+        <!-- Controles de Atualização -->
+        <div class="refresh-controls">
+            <div>
+                <button onclick="refreshPayments()" class="btn-primary">
+                    🔄 Atualizar
+                </button>
+                <button onclick="exportPayments()" class="btn-outline">
+                    📤 Exportar CSV
+                </button>
+                <button onclick="clearAllPayments()" class="btn-outline" style="background: #dc3545; color: white;">
+                    🗑️ Limpar Tudo
+                </button>
+            </div>
+            <div class="last-update">
+                Última atualização: <span id="lastUpdate">-</span>
+            </div>
+        </div>
+
+        <!-- Tabela de Pagamentos -->
+        <div class="payments-table">
+            <div class="table-header">
+                <h3>💰 Pagamentos Bitcoin</h3>
+            </div>
+            <div id="paymentsContainer">
+                <div class="no-payments">
+                    <p>📋 Nenhum pagamento encontrado</p>
+                    <p>Os pagamentos aparecerão aqui automaticamente quando forem criados</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Detalhes -->
+        <div id="paymentModal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2>📋 Detalhes do Pagamento</h2>
+                <div id="modalContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="control.js"></script>
+</body>
+</html>

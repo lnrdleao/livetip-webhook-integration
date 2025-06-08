@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagamento - LiveTip</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💰 LiveTip - Pagamentos</h1>
+            <p>Faça seu pagamento via PIX ou Bitcoin</p>
+        </header>
+
+        <main>
+            <!-- Formulário de Pagamento -->
+            <div class="card" id="paymentForm">
+                <h2>📝 Dados do Pagamento</h2>
+                <form id="payment-form">                    <div class="input-group">
+                        <label for="userName">👤 Nome do Usuário:</label>
+                        <input type="text" id="userName" name="userName" required 
+                               placeholder="Digite seu nome completo">
+                    </div>
+                    
+                    <div class="input-group" id="uniqueIdGroup" style="display: none;">
+                        <label for="uniqueId">🔑 Identificador Único:</label>
+                        <input type="text" id="uniqueId" name="uniqueId" readonly 
+                               placeholder="Será gerado automaticamente">
+                    </div>
+
+                    <div class="input-group" id="amountGroup">
+                        <label for="amount" id="amountLabel">💵 Valor (R$):</label>
+                        <input type="number" id="amount" name="amount" step="0.01" min="0.01" required 
+                               placeholder="10.00">
+                    </div>                    <!-- Valores pré-definidos para Bitcoin (Satoshis) -->
+                    <div class="input-group" id="satoshiValues" style="display: none;">
+                        <label>⚡ Valores em Satoshis:</label>
+                        <div class="satoshi-buttons">
+                            <button type="button" class="satoshi-btn" data-sats="100">
+                                <span class="sats">100 sats</span>
+                            </button>
+                            <button type="button" class="satoshi-btn" data-sats="200">
+                                <span class="sats">200 sats</span>
+                            </button>
+                            <button type="button" class="satoshi-btn" data-sats="300">
+                                <span class="sats">300 sats</span>
+                            </button>
+                            <button type="button" class="satoshi-btn" data-sats="400">
+                                <span class="sats">400 sats</span>
+                            </button>
+                        </div>
+                        <div class="satoshi-info">
+                            <p>💡 <strong>Mínimo:</strong> 100 satoshis para pagamentos Bitcoin</p>
+                            <p>📊 <strong>Taxa atual:</strong> 1 BTC = ~R$ 300.000 (aproximado)</p>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>💳 Método de Pagamento:</label>
+                        <div class="payment-methods">
+                            <label class="payment-option">
+                                <input type="radio" name="paymentMethod" value="pix" checked>
+                                <span class="payment-button pix">
+                                    <i>🏦</i>
+                                    PIX
+                                </span>
+                            </label>
+                            <label class="payment-option">
+                                <input type="radio" name="paymentMethod" value="bitcoin">
+                                <span class="payment-button bitcoin">
+                                    <i>₿</i>
+                                    Bitcoin
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">
+                        🎯 Gerar QR Code de Pagamento
+                    </button>
+                </form>
+            </div>
+
+            <!-- Área do QR Code -->
+            <div class="card" id="qrCodeSection" style="display: none;">
+                <h2>📱 QR Code para Pagamento</h2>
+                <div class="qr-container">
+                    <img id="qrCodeImage" alt="QR Code de Pagamento">
+                </div>
+                <div class="payment-info">
+                    <h3 id="paymentMethodTitle"></h3>
+                    <p><strong>Usuário:</strong> <span id="paymentUserName"></span></p>
+                    <p><strong>Valor:</strong> R$ <span id="paymentAmount"></span></p>
+                    <p><strong>Status:</strong> <span id="paymentStatus" class="status-pending">Aguardando pagamento</span></p>
+                    <div id="paymentDetails"></div>
+                </div>
+                <div class="actions">
+                    <button onclick="checkPaymentStatus()" class="btn-secondary">
+                        🔄 Verificar Status
+                    </button>
+                    <button onclick="newPayment()" class="btn-outline">
+                        ➕ Novo Pagamento
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Gerando QR Code...</p>
+            </div>            <!-- Histórico de Pagamentos -->
+            <div class="card" id="paymentHistory">
+                <h2>📊 Controle de Pagamentos Bitcoin</h2>
+                <div class="control-buttons">
+                    <button onclick="loadPaymentHistory()" class="btn-outline">
+                        📜 Carregar Histórico
+                    </button>
+                    <button onclick="exportPayments()" class="btn-outline">
+                        📤 Exportar Dados
+                    </button>
+                    <button onclick="clearHistory()" class="btn-outline" style="background: #dc3545;">
+                        🗑️ Limpar Histórico
+                    </button>
+                </div>
+                <div id="paymentStats" class="payment-stats"></div>
+                <div id="historyList" class="history-container"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

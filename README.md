@@ -1,14 +1,23 @@
-# Webhook Payment Page - LiveTip
+# ⚡ LiveTip Webhook Integration
 
-Uma página web simples para integração com webhook de pagamentos que gera QR codes para PIX e Bitcoin.
+Sistema completo de pagamentos PIX e Bitcoin Lightning com integração à API LiveTip.
 
-## 🚀 Características
+## 🚀 Features
 
-- ✅ Interface moderna e responsiva
-- ✅ Suporte a pagamentos PIX e Bitcoin
-- ✅ Geração automática de QR codes
-- ✅ Verificação de status em tempo real
-- ✅ Histórico de pagamentos
+- ✅ **Pagamentos PIX** via API LiveTip com fallback local
+- ⚡ **Bitcoin Lightning Invoices** via API LiveTip 
+- 🔧 **Sistema de Webhook** para confirmação automática
+- 🖼️ **QR Codes com logos** personalizados (PIX/Bitcoin)
+- 📊 **Painel de controle** para monitoramento
+- 🎯 **Deploy fácil** na Vercel/Railway
+
+## 🛠️ Tecnologias
+
+- **Backend**: Node.js, Express
+- **Frontend**: HTML5, CSS3, JavaScript  
+- **Pagamentos**: LiveTip API
+- **QR Codes**: qrcode + canvas (logos customizados)
+- **Deploy**: Vercel ready
 - ✅ Webhook para receber notificações de pagamento
 
 ## 📋 Pré-requisitos

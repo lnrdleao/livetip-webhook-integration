@@ -991,3 +991,6 @@ app.listen(PORT, () => {
     console.log('🔑 Token do webhook LiveTip configurado');
     console.log('✅ Sistema pronto para receber pagamentos!');
 });
+
+// Exportar a aplicação para Vercel
+module.exports = app;

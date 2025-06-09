@@ -1,0 +1,35 @@
+{
+  "name": "livetip-webhook-integration",
+  "version": "1.0.0",
+  "description": "LiveTip Bitcoin Lightning Invoice Webhook Integration System - PIX/Bitcoin Payments",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'Build completed'",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "livetip",
+    "bitcoin",
+    "lightning",
+    "webhook",
+    "payment",
+    "pix",
+    "qrcode"
+  ],
+  "author": "lnrdleao",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

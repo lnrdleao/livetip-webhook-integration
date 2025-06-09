@@ -1,0 +1,38 @@
+{
+  "name": "livetip-webhook-integration",
+  "version": "1.0.0",
+  "description": "LiveTip Bitcoin Lightning Invoice Webhook Integration System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'Build completed - Static files ready'",
+    "test": "node test-webhook-simple.js"
+  },
+  "keywords": [
+    "livetip",
+    "bitcoin",
+    "lightning",
+    "webhook",
+    "qr-code",
+    "payment"
+  ],
+  "author": "lnrdleao",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "crypto": "^1.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lnrdleao/livetip-webhook-integration.git"
+  },
+  "homepage": "https://github.com/lnrdleao/livetip-webhook-integration#readme"
+}

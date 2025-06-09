@@ -1,5 +1,13 @@
 // LiveTip Webhook System - Versão Completa para Vercel
 module.exports = (req, res) => {
+    // Debug - log da requisição para investigar o problema 404
+    console.log('🔍 Debug Request:', {
+        url: req.url,
+        method: req.method,
+        headers: req.headers,
+        query: req.query
+    });
+    
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -12,8 +20,11 @@ module.exports = (req, res) => {
     
     const { url, method } = req;
     
+    // Debug adicional para verificar roteamento
+    console.log(`📍 Route matching: ${method} ${url}`);
+    
     // Rota principal
-    if (url === '/' && method === 'GET') {
+    if ((url === '/' || url === '') && method === 'GET') {
         res.setHeader('Content-Type', 'text/html');
         res.status(200).send(`
             <!DOCTYPE html>

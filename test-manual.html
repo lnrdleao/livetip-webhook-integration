@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Manual - LiveTip</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste Manual - LiveTip</h1>
+    
+    <div class="test-section">
+        <h2>📋 Informações do Sistema</h2>
+        <div id="systemInfo" class="test-result info">
+            <p><strong>Data/Hora:</strong> <span id="datetime"></span></p>
+            <p><strong>URL Atual:</strong> <span id="currentUrl"></span></p>
+            <p><strong>User Agent:</strong> <span id="userAgent"></span></p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Teste de Funcionalidades JavaScript</h2>
+        
+        <h3>Geração de ID Único</h3>
+        <button onclick="testUniqueId()">Gerar ID Único</button>
+        <div id="uniqueIdResult" class="test-result"></div>
+        
+        <h3>Validação de Formulário</h3>
+        <input type="text" id="userName" placeholder="Nome do usuário">
+        <input type="number" id="amount" placeholder="Valor" step="0.01">
+        <select id="paymentMethod">
+            <option value="pix">PIX</option>
+            <option value="bitcoin">Bitcoin</option>
+        </select>
+        <button onclick="testFormValidation()">Validar Formulário</button>
+        <div id="formValidationResult" class="test-result"></div>
+        
+        <h3>Teste de Conectividade com Servidor</h3>
+        <button onclick="testServerConnection()">Testar Conexão</button>
+        <div id="serverConnectionResult" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>💰 Simulação de Pagamentos</h2>
+        
+        <h3>PIX</h3>
+        <button onclick="simulatePixPayment()">Simular PIX</button>
+        <div id="pixResult" class="test-result"></div>
+        
+        <h3>Bitcoin</h3>
+        <div>
+            <label>Valor em Satoshis:</label>
+            <button onclick="simulateBitcoinPayment(100)">100 sats</button>
+            <button onclick="simulateBitcoinPayment(200)">200 sats</button>
+            <button onclick="simulateBitcoinPayment(300)">300 sats</button>
+            <button onclick="simulateBitcoinPayment(400)">400 sats</button>
+        </div>
+        <div id="bitcoinResult" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Resultados dos Testes</h2>
+        <div id="testSummary" class="test-result info">
+            <p>Clique nos botões acima para executar os testes.</p>
+        </div>
+    </div>
+
+    <script>
+        // Inicializar informações do sistema
+        document.getElementById('datetime').textContent = new Date().toLocaleString('pt-BR');
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+
+        let testResults = [];
+
+        function addTestResult(test, success, message) {
+            testResults.push({
+                test: test,
+                success: success,
+                message: message,
+                timestamp: new Date().toLocaleString('pt-BR')
+            });
+            updateTestSummary();
+        }
+
+        function updateTestSummary() {
+            const summaryDiv = document.getElementById('testSummary');
+            const passed = testResults.filter(r => r.success).length;
+            const failed = testResults.filter(r => !r.success).length;
+            
+            summaryDiv.innerHTML = `
+                <h4>Resumo dos Testes</h4>
+                <p><strong>Total:</strong> ${testResults.length} | 
+                   <strong>Passou:</strong> ${passed} | 
+                   <strong>Falhou:</strong> ${failed}</p>
+                <ul>
+                    ${testResults.map(r => 
+                        `<li style="color: ${r.success ? 'green' : 'red'}">
+                            ${r.test}: ${r.message} (${r.timestamp})
+                        </li>`
+                    ).join('')}
+                </ul>
+            `;
+        }
+
+        function testUniqueId() {
+            try {
+                const timestamp = Date.now();
+                const random = Math.random().toString(36).substring(2, 8);
+                const uniqueId = `BTC_${timestamp}_${random}`.toUpperCase();
+                
+                document.getElementById('uniqueIdResult').className = 'test-result success';
+                document.getElementById('uniqueIdResult').innerHTML = `
+                    <strong>✅ ID Único Gerado:</strong><br>
+                    ${uniqueId}
+                `;
+                
+                addTestResult('Geração de ID Único', true, `ID gerado: ${uniqueId}`);
+            } catch (error) {
+                document.getElementById('uniqueIdResult').className = 'test-result error';
+                document.getElementById('uniqueIdResult').innerHTML = `
+                    <strong>❌ Erro:</strong> ${error.message}
+                `;
+                addTestResult('Geração de ID Único', false, error.message);
+            }
+        }
+
+        function testFormValidation() {
+            const userName = document.getElementById('userName').value;
+            const amount = document.getElementById('amount').value;
+            const paymentMethod = document.getElementById('paymentMethod').value;
+            
+            const errors = [];
+            
+            if (!userName.trim()) {
+                errors.push('Nome do usuário é obrigatório');
+            }
+            
+            if (!amount || parseFloat(amount) <= 0) {
+                errors.push('Valor deve ser maior que zero');
+            }
+            
+            if (paymentMethod === 'bitcoin' && parseFloat(amount) < 100) {
+                errors.push('Valor mínimo para Bitcoin é 100 satoshis');
+            }
+            
+            const resultDiv = document.getElementById('formValidationResult');
+            
+            if (errors.length === 0) {
+                resultDiv.className = 'test-result success';
+                resultDiv.innerHTML = `
+                    <strong>✅ Validação Bem-sucedida:</strong><br>
+                    Nome: ${userName}<br>
+                    Valor: ${amount}<br>
+                    Método: ${paymentMethod}
+                `;
+                addTestResult('Validação de Formulário', true, 'Todos os campos válidos');
+            } else {
+                resultDiv.className = 'test-result error';
+                resultDiv.innerHTML = `
+                    <strong>❌ Erros de Validação:</strong><br>
+                    ${errors.map(err => `• ${err}`).join('<br>')}
+                `;
+                addTestResult('Validação de Formulário', false, `${errors.length} erro(s) encontrado(s)`);
+            }
+        }
+
+        async function testServerConnection() {
+            const resultDiv = document.getElementById('serverConnectionResult');
+            resultDiv.className = 'test-result info';
+            resultDiv.innerHTML = '🔄 Testando conexão...';
+            
+            try {
+                const response = await fetch('http://localhost:3001/health', {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    resultDiv.className = 'test-result success';
+                    resultDiv.innerHTML = '✅ Servidor acessível na porta 3001';
+                    addTestResult('Conexão com Servidor', true, 'Servidor respondendo');
+                } else {
+                    throw new Error(`Status: ${response.status}`);
+                }
+            } catch (error) {
+                resultDiv.className = 'test-result error';
+                resultDiv.innerHTML = `❌ Servidor não acessível: ${error.message}`;
+                addTestResult('Conexão com Servidor', false, error.message);
+            }
+        }
+
+        function simulatePixPayment() {
+            const resultDiv = document.getElementById('pixResult');
+            
+            try {
+                const paymentData = {
+                    userName: 'Usuário Teste',
+                    paymentMethod: 'pix',
+                    amount: 50.00,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Simular geração de código PIX
+                const pixCode = `00020126580014br.gov.bcb.pix0136usuario@exemplo.com5204000053039865802BR5925LIVETIP PAGAMENTOS6009SAO PAULO62070503***6304${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+                
+                resultDiv.className = 'test-result success';
+                resultDiv.innerHTML = `
+                    <strong>✅ PIX Simulado:</strong><br>
+                    Nome: ${paymentData.userName}<br>
+                    Valor: R$ ${paymentData.amount.toFixed(2)}<br>
+                    Código PIX: ${pixCode.substring(0, 50)}...<br>
+                    <small>Timestamp: ${paymentData.timestamp}</small>
+                `;
+                
+                addTestResult('Simulação PIX', true, `R$ ${paymentData.amount.toFixed(2)}`);
+            } catch (error) {
+                resultDiv.className = 'test-result error';
+                resultDiv.innerHTML = `❌ Erro na simulação PIX: ${error.message}`;
+                addTestResult('Simulação PIX', false, error.message);
+            }
+        }
+
+        function simulateBitcoinPayment(satoshis) {
+            const resultDiv = document.getElementById('bitcoinResult');
+            
+            try {
+                const uniqueId = `BTC_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`.toUpperCase();
+                
+                const paymentData = {
+                    userName: 'Usuário Bitcoin',
+                    paymentMethod: 'bitcoin',
+                    amount: satoshis,
+                    uniqueId: uniqueId,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Simular dados da API LiveTip
+                const apiData = {
+                    sender: paymentData.userName,
+                    content: uniqueId,
+                    currency: "BTC",
+                    amount: (satoshis / 100000000).toFixed(8) // Conversão para BTC
+                };
+                
+                resultDiv.className = 'test-result success';
+                resultDiv.innerHTML = `
+                    <strong>✅ Bitcoin Simulado:</strong><br>
+                    Nome: ${paymentData.userName}<br>
+                    Valor: ${satoshis} satoshis (${apiData.amount} BTC)<br>
+                    ID Único: ${uniqueId}<br>
+                    <small>Timestamp: ${paymentData.timestamp}</small><br>
+                    <small>Payload API: ${JSON.stringify(apiData)}</small>
+                `;
+                
+                addTestResult('Simulação Bitcoin', true, `${satoshis} sats`);
+            } catch (error) {
+                resultDiv.className = 'test-result error';
+                resultDiv.innerHTML = `❌ Erro na simulação Bitcoin: ${error.message}`;
+                addTestResult('Simulação Bitcoin', false, error.message);
+            }
+        }
+
+        // Executar alguns testes automaticamente ao carregar a página
+        window.onload = function() {
+            testUniqueId();
+            setTimeout(() => {
+                testServerConnection();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

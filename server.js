@@ -899,8 +899,20 @@ app.post('/generate-qr', async (req, res) => {
             success: false,
             error: 'Erro interno do servidor',
             details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
+        });    }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        version: '1.0.0',
+        port: PORT,
+        payments: payments.size,
+        webhookLogs: webhookLogs.length
+    });
 });
 
 app.listen(PORT, () => {

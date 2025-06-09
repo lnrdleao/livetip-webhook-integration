@@ -75,6 +75,37 @@ app.get('/control', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'control.html'));
 });
 
+// Rota para página de monitoramento de webhook
+app.get('/webhook-monitor', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'webhook-monitor.html'));
+});
+
+// Rota GET para o endpoint webhook (página de status)
+app.get('/webhook', (req, res) => {
+    const stats = {
+        totalWebhooks: webhookLogs.length,
+        totalPayments: payments.size,
+        lastWebhook: webhookLogs.length > 0 ? webhookLogs[webhookLogs.length - 1] : null,
+        status: 'active',
+        endpoint: req.get('host') + '/webhook',
+        timestamp: new Date().toISOString()
+    };
+
+    res.json({
+        message: 'LiveTip Webhook Endpoint Ativo',
+        description: 'Este endpoint recebe confirmações de pagamento via POST',
+        ...stats,
+        instructions: {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Livetip-Webhook-Secret-Token': 'seu_token_aqui'
+            },
+            monitor_url: `${req.protocol}://${req.get('host')}/webhook-monitor`
+        }
+    });
+});
+
 // Rota para criar um novo pagamento
 app.post('/create-payment', async (req, res) => {
     try {
@@ -942,15 +973,19 @@ app.listen(PORT, () => {
     console.log(`💰 PIX Key: ${config.pix.key}`);
     console.log(`₿ Bitcoin Address: ${config.bitcoin.address}`);
     console.log(`🌍 Environment: ${config.server.environment}`);
-    console.log('');
-    console.log('📊 Endpoints disponíveis:');
+    console.log('');    console.log('📊 Endpoints disponíveis:');
     console.log(`   GET  ${config.app.baseUrl}/                 - Interface principal`);
-    console.log(`   POST ${config.app.baseUrl}/create-payment   - Criar pagamento`);
+    console.log(`   GET  ${config.app.baseUrl}/control          - Página de controle`);
+    console.log(`   GET  ${config.app.baseUrl}/webhook-monitor  - Monitor webhook`);
+    console.log(`   GET  ${config.app.baseUrl}/webhook          - Status webhook`);
     console.log(`   POST ${config.app.baseUrl}/webhook          - Receber webhook LiveTip`);
+    console.log(`   POST ${config.app.baseUrl}/create-payment   - Criar pagamento`);
+    console.log(`   POST ${config.app.baseUrl}/generate-qr      - Gerar QR Code`);
     console.log(`   GET  ${config.app.baseUrl}/payments         - Listar pagamentos`);
     console.log(`   GET  ${config.app.baseUrl}/payment-status/:id - Status de pagamento`);
     console.log(`   GET  ${config.app.baseUrl}/webhook-logs     - Logs do webhook`);
     console.log(`   GET  ${config.app.baseUrl}/webhook-stats    - Estatísticas`);
+    console.log(`   GET  ${config.app.baseUrl}/health           - Health check`);
     console.log(`   POST ${config.app.baseUrl}/test-webhook     - Testar webhook (dev)`);
     console.log('');
     console.log('🔑 Token do webhook LiveTip configurado');

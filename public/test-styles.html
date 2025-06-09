@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Estilos - LiveTip</title>
+    <style>
+        /* CSS inline para teste */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+        }
+
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .test-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #2c3e50;
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ecf0f1;
+            border-radius: 8px;
+        }
+
+        .status-ok { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-warning { background: #fff3cd; color: #856404; }
+
+        .test-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🧪 Teste de Carregamento - LiveTip</h1>
+            <p>Verificando se os elementos visuais estão carregando corretamente na Vercel</p>
+        </div>
+
+        <div class="test-section status-ok">
+            <h3>✅ CSS Inline Funcionando</h3>
+            <p>Se você está vendo este card com fundo branco, gradiente azul/roxo e estilos aplicados, o CSS inline está funcionando.</p>
+        </div>
+
+        <div class="test-section" id="cssFileTest">
+            <h3>🔄 Testando CSS Externo</h3>
+            <p>Verificando se o arquivo style.css está sendo carregado...</p>
+            <button class="test-button" onclick="testCSSFile()">Testar CSS Externo</button>
+        </div>
+
+        <div class="test-section" id="jsTest">
+            <h3>🔄 Testando JavaScript</h3>
+            <p>Verificando se o arquivo script.js está sendo carregado...</p>
+            <button class="test-button" onclick="testJavaScript()">Testar JavaScript</button>
+        </div>
+
+        <div class="test-section" id="resourcesTest">
+            <h3>📋 Teste de Recursos</h3>
+            <button class="test-button" onclick="testResources()">Verificar Recursos</button>
+            <div id="resourcesResult"></div>
+        </div>
+
+        <div class="test-section" id="networkTest">
+            <h3>🌐 Teste de Rede</h3>
+            <button class="test-button" onclick="testNetwork()">Testar Conectividade</button>
+            <div id="networkResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Informações do Sistema</h3>
+            <pre id="systemInfo"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Mostrar informações do sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            const systemInfo = document.getElementById('systemInfo');
+            systemInfo.textContent = `
+URL: ${window.location.href}
+User Agent: ${navigator.userAgent}
+Viewport: ${window.innerWidth} x ${window.innerHeight}
+Timestamp: ${new Date().toLocaleString('pt-BR')}
+Protocol: ${window.location.protocol}
+Host: ${window.location.host}
+            `.trim();
+        });
+
+        function testCSSFile() {
+            const testDiv = document.getElementById('cssFileTest');
+            
+            // Tentar carregar CSS externo
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '/style.css';
+            
+            link.onload = function() {
+                testDiv.className = 'test-section status-ok';
+                testDiv.innerHTML = '<h3>✅ CSS Externo Carregado</h3><p>O arquivo style.css foi carregado com sucesso!</p>';
+            };
+            
+            link.onerror = function() {
+                testDiv.className = 'test-section status-error';
+                testDiv.innerHTML = '<h3>❌ Erro no CSS Externo</h3><p>Não foi possível carregar o arquivo style.css</p>';
+            };
+            
+            document.head.appendChild(link);
+        }
+
+        function testJavaScript() {
+            const testDiv = document.getElementById('jsTest');
+            
+            // Tentar carregar JavaScript externo
+            const script = document.createElement('script');
+            script.src = '/script.js';
+            
+            script.onload = function() {
+                testDiv.className = 'test-section status-ok';
+                testDiv.innerHTML = '<h3>✅ JavaScript Carregado</h3><p>O arquivo script.js foi carregado com sucesso!</p>';
+            };
+            
+            script.onerror = function() {
+                testDiv.className = 'test-section status-error';
+                testDiv.innerHTML = '<h3>❌ Erro no JavaScript</h3><p>Não foi possível carregar o arquivo script.js</p>';
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        async function testResources() {
+            const resultDiv = document.getElementById('resourcesResult');
+            resultDiv.innerHTML = '<p>🔄 Testando recursos...</p>';
+            
+            const resources = [
+                { name: 'CSS', url: '/style.css' },
+                { name: 'JavaScript', url: '/script.js' },
+                { name: 'Health Check', url: '/health' }
+            ];
+            
+            let results = '<h4>Resultados:</h4><ul>';
+            
+            for (const resource of resources) {
+                try {
+                    const response = await fetch(resource.url);
+                    if (response.ok) {
+                        results += `<li>✅ ${resource.name}: OK (${response.status})</li>`;
+                    } else {
+                        results += `<li>❌ ${resource.name}: Erro ${response.status}</li>`;
+                    }
+                } catch (error) {
+                    results += `<li>❌ ${resource.name}: ${error.message}</li>`;
+                }
+            }
+            
+            results += '</ul>';
+            resultDiv.innerHTML = results;
+        }
+
+        async function testNetwork() {
+            const resultDiv = document.getElementById('networkResult');
+            resultDiv.innerHTML = '<p>🔄 Testando conectividade...</p>';
+            
+            try {
+                const response = await fetch('/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `
+                        <h4>✅ Servidor Respondendo</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<h4>❌ Erro do Servidor</h4><p>Status: ${response.status}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<h4>❌ Erro de Rede</h4><p>${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

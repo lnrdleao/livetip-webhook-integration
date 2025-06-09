@@ -9,9 +9,8 @@ const config = {    // Configurações do servidor
         apiUrl: process.env.API_URL || 'https://api.livetip.gg/v1',
         
         // Token de autenticação (se necessário)
-        apiToken: process.env.API_TOKEN || '',
-          // Chave secreta para validar webhooks do LiveTip
-        webhookSecret: process.env.WEBHOOK_SECRET || '37de1854e9469607092124ed015c1f91',
+        apiToken: process.env.API_TOKEN || '',        // Chave secreta para validar webhooks do LiveTip
+        webhookSecret: process.env.WEBHOOK_SECRET || '0ac7b9aa00e75e0215243f3bb177c844',
         
         // URL pública do seu webhook (onde o LiveTip enviará notificações)
         webhookUrl: process.env.WEBHOOK_URL || 'https://seu-dominio.com/webhook'

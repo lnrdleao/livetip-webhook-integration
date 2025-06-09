@@ -26,7 +26,9 @@ const PORT = config.server.port;
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static('public'));
+
+// Configurar arquivos estáticos com caminho absoluto
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Armazenar pagamentos e logs de webhook em memória (em produção, use um banco de dados)
 const payments = new Map();
@@ -913,6 +915,24 @@ app.get('/health', (req, res) => {
         payments: payments.size,
         webhookLogs: webhookLogs.length
     });
+});
+
+// Endpoints específicos para arquivos estáticos (fallback para Vercel)
+app.get('/style.css', (req, res) => {
+    res.setHeader('Content-Type', 'text/css');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.sendFile(path.join(__dirname, 'public', 'style.css'));
+});
+
+app.get('/script.js', (req, res) => {
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.sendFile(path.join(__dirname, 'public', 'script.js'));
+});
+
+// Endpoint para favicon (evitar erros 404)
+app.get('/favicon.ico', (req, res) => {
+    res.status(204).send();
 });
 
 app.listen(PORT, () => {

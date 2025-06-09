@@ -1,15 +1,16 @@
-# ⚡ LiveTip Webhook Integration
+# 🚀 LiveTip Webhook Integration System
 
-Sistema completo de pagamentos PIX e Bitcoin Lightning com integração à API LiveTip.
+Sistema completo de integração com webhook da LiveTip para pagamentos PIX e Bitcoin com interface web moderna.
 
-## 🚀 Features
+## 📋 Características Principais
 
-- ✅ **Pagamentos PIX** via API LiveTip com fallback local
-- ⚡ **Bitcoin Lightning Invoices** via API LiveTip 
-- 🔧 **Sistema de Webhook** para confirmação automática
-- 🖼️ **QR Codes com logos** personalizados (PIX/Bitcoin)
-- 📊 **Painel de controle** para monitoramento
-- 🎯 **Deploy fácil** na Vercel/Railway
+- 💰 **Pagamentos PIX**: Geração automática de QR Codes PIX
+- ₿ **Pagamentos Bitcoin**: Integração com Lightning Network via LiveTip
+- 🎯 **Interface Moderna**: Design responsivo e intuitivo
+- 📱 **QR Codes com Logo**: QR Codes personalizados com logo LiveTip
+- 🔐 **Webhook Seguro**: Sistema de webhook com validação
+- 📊 **Histórico Completo**: Controle detalhado de pagamentos Bitcoin
+- ⚡ **Valores em Satoshis**: Suporte nativo a valores em satoshis (100, 200, 300, 400)
 
 ## 🛠️ Tecnologias
 

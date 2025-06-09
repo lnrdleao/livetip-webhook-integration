@@ -1,8 +1,9 @@
 {
-  "name": "webhook-payment-page",
+  "name": "livetip-webhook-integration",
   "version": "1.0.0",
-  "description": "Página para integração com webhook de pagamentos PIX/Bitcoin",
-  "main": "server.js",  "scripts": {
+  "description": "LiveTip Bitcoin Lightning Invoice Webhook Integration System - PIX/Bitcoin Payments",
+  "main": "server.js",
+  "scripts": {
     "start": "node server.js",
     "build": "echo 'Build completed'",
     "dev": "nodemon server.js",
@@ -31,18 +32,29 @@
     "node-fetch": "^2.7.0",
     "qrcode": "^1.5.3",
     "qrcode-with-logos": "^1.1.1",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "crypto": "^1.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
   "keywords": [
+    "livetip",
+    "bitcoin",
+    "lightning",
     "webhook",
     "payment",
     "pix",
-    "bitcoin",
     "qrcode"
   ],
-  "author": "Leonardo",
-  "license": "MIT"
+  "author": "lnrdleao",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lnrdleao/livetip-webhook-integration.git"
+  },
+  "homepage": "https://github.com/lnrdleao/livetip-webhook-integration#readme"
 }

@@ -380,92 +380,616 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
         `);
         return;
     }
-    
-    // Webhook Monitor avançado
+      // Webhook Monitor avançado
     if (url === '/webhook-monitor' && method === 'GET') {
         res.setHeader('Content-Type', 'text/html');
         res.status(200).send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>LiveTip - Webhook Monitor</title>
-                <meta charset="UTF-8">
-                <style>
-                    body { 
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                        margin: 0; 
-                        padding: 20px; 
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        min-height: 100vh;
-                    }
-                    .container {
-                        max-width: 1200px;
-                        margin: 0 auto;
-                        background: rgba(255,255,255,0.95);
-                        padding: 30px;
-                        border-radius: 15px;
-                        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                    }
-                    .card { 
-                        background: white; 
-                        padding: 25px; 
-                        border-radius: 10px; 
-                        box-shadow: 0 5px 15px rgba(0,0,0,0.1); 
-                        margin: 20px 0; 
-                        border-left: 5px solid #007bff;
-                    }
-                    .status-ok { color: #28a745; font-weight: bold; }
-                    .status-error { color: #dc3545; font-weight: bold; }
-                    .metric { display: inline-block; margin: 10px 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; }
-                    .nav { margin-bottom: 20px; }
-                    .nav a { margin-right: 15px; padding: 8px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>🎯 LiveTip - Webhook Monitor Avançado</h1>
-                    
-                    <div class="nav">
-                        <a href="/">🏠 Home</a>
-                        <a href="/monitor">📊 Monitor Básico</a>
-                        <a href="/control">🎛️ Control Panel</a>
-                        <a href="/docs">📚 Docs</a>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>📊 Status em Tempo Real</h3>
-                        <p>📅 Última Atualização: ${new Date().toLocaleString('pt-BR')}</p>
-                        <div class="metric">Status: <span class="status-ok">✅ ONLINE</span></div>
-                        <div class="metric">Webhook: <span class="status-ok">✅ ATIVO</span></div>
-                        <div class="metric">Uptime: <span class="status-ok">99.9%</span></div>
-                        <div class="metric">Response Time: <span class="status-ok">< 150ms</span></div>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>🎯 Estatísticas de Webhook</h3>
-                        <div class="metric">Total Recebidos: <strong>0</strong></div>
-                        <div class="metric">Processados: <strong>0</strong></div>
-                        <div class="metric">Erros: <strong>0</strong></div>
-                        <div class="metric">Taxa de Sucesso: <strong>100%</strong></div>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>🔧 Configurações Ativas</h3>
-                        <p><strong>Endpoint:</strong> https://livetip-webhook-integration.vercel.app/webhook</p>
-                        <p><strong>Token:</strong> 0ac7b9aa00e75e0215243f3bb177c844</p>
-                        <p><strong>Header:</strong> X-Livetip-Webhook-Secret-Token</p>
-                        <p><strong>Métodos:</strong> GET, POST</p>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>📈 Logs Recentes</h3>
-                        <p>🕐 ${new Date().toLocaleString('pt-BR')} - Sistema iniciado</p>
-                        <p>🕐 ${new Date().toLocaleString('pt-BR')} - Webhook endpoint ativo</p>
-                        <p>🕐 ${new Date().toLocaleString('pt-BR')} - Monitoramento funcionando</p>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Monitor - LiveTip</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .status-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            transform: translateY(0);
+            transition: all 0.3s ease;
+        }
+
+        .status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+
+        .status-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .status-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .status-online {
+            color: #28a745;
+        }
+
+        .status-offline {
+            color: #dc3545;
+        }
+
+        .status-warning {
+            color: #ffc107;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            margin-bottom: 1.5rem;
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            margin: 0 5px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .timestamp {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 1rem 0;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+            background: #f8f9fa;
+        }
+
+        .log-entry {
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .log-success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+
+        .log-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        .log-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .payment-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .payment-confirmed {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .payment-pending {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+
+        .payment-failed {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .status-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Webhook Monitor - LiveTip</h1>
+            <p>Monitor em tempo real dos webhooks e pagamentos</p>
+        </div>
+
+        <!-- Status Cards -->
+        <div class="status-cards">
+            <div class="status-card">
+                <div class="status-icon">🌐</div>
+                <div class="status-title">Conectividade</div>
+                <div class="status-value status-online" id="connectionStatus">ONLINE</div>
+            </div>
+            
+            <div class="status-card">
+                <div class="status-icon">📡</div>
+                <div class="status-title">Último Webhook</div>
+                <div class="status-value" id="lastWebhook">Aguardando...</div>
+            </div>
+            
+            <div class="status-card">
+                <div class="status-icon">⏱️</div>
+                <div class="status-title">Última Verificação</div>
+                <div class="status-value" id="lastCheck">${new Date().toLocaleString('pt-BR')}</div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="card">
+            <h2>🎛️ Controles</h2>
+            <div class="controls">
+                <button class="btn" onclick="refreshData()">🔄 Atualizar</button>
+                <button class="btn btn-success" onclick="testWebhook()">🧪 Testar Webhook</button>
+                <button class="btn btn-secondary" onclick="clearLogs()">🗑️ Limpar Logs</button>
+                
+                <div class="auto-refresh">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="autoRefreshCheck" onchange="toggleAutoRefresh()">
+                        <label for="autoRefreshCheck" id="autoRefreshText">▶️ Auto Refresh (5s)</label>
                     </div>
                 </div>
-            </body>
-            </html>
+            </div>
+
+            <div class="loading" id="loadingIndicator">
+                <div class="spinner"></div>
+                <div>Carregando dados...</div>
+            </div>
+        </div>
+
+        <!-- Two Column Layout -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <!-- Webhook Logs -->
+            <div class="card">
+                <h2>📋 Logs do Webhook</h2>
+                <div class="log-container" id="webhookLogs">
+                    <div class="log-entry log-info">Sistema iniciado - Aguardando webhooks...</div>
+                </div>
+            </div>
+
+            <!-- Recent Payments -->
+            <div class="card">
+                <h2>💰 Pagamentos Recentes</h2>
+                <div id="recentPayments">
+                    <div class="payment-item payment-pending">
+                        <strong>Sistema Iniciado</strong><br>
+                        <small>Aguardando confirmações de pagamento...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Full Stats -->
+        <div class="card" style="margin-top: 2rem;">
+            <h2>📈 Estatísticas Detalhadas</h2>
+            <div class="stats-grid" id="detailedStats">
+                <div class="stat-box">
+                    <div class="stat-number" id="totalPayments">0</div>
+                    <div>Total Pagamentos</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="confirmedPayments">0</div>
+                    <div>Confirmados</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="pendingPayments">0</div>
+                    <div>Pendentes</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="failedPayments">0</div>
+                    <div>Falhados</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval = null;
+        let lastWebhookTime = null;
+
+        // Função para atualizar dados
+        async function refreshData() {
+            showLoading(true);
+            
+            try {
+                // Buscar logs do webhook
+                const logsResponse = await fetch('/webhook-logs?limit=20');
+                const logsData = await logsResponse.json();
+                updateWebhookLogs(logsData.logs);
+
+                // Buscar estatísticas
+                const statsResponse = await fetch('/webhook-stats');
+                const statsData = await statsResponse.json();
+                updateStats(statsData);
+
+                // Buscar pagamentos
+                const paymentsResponse = await fetch('/payments');
+                const paymentsData = await paymentsResponse.json();
+                updatePayments(paymentsData.payments);
+
+                // Verificar conectividade
+                await checkConnectivity();
+
+                updateLastCheckTime();
+            } catch (error) {
+                console.error('Erro ao atualizar dados:', error);
+                addLogEntry('error', \`Erro ao atualizar: \${error.message}\`);
+                updateConnectionStatus(false);
+            }
+            
+            showLoading(false);
+        }
+
+        // Função para verificar conectividade
+        async function checkConnectivity() {
+            try {
+                const response = await fetch('/health');
+                if (response.ok) {
+                    updateConnectionStatus(true);
+                    return true;
+                } else {
+                    updateConnectionStatus(false);
+                    return false;
+                }
+            } catch (error) {
+                updateConnectionStatus(false);
+                return false;
+            }
+        }
+
+        // Atualizar logs do webhook
+        function updateWebhookLogs(logs) {
+            const container = document.getElementById('webhookLogs');
+            container.innerHTML = '';
+
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="log-entry log-info">Nenhum webhook recebido ainda</div>';
+                return;
+            }
+
+            logs.forEach(log => {
+                const logEntry = document.createElement('div');
+                logEntry.className = \`log-entry log-\${log.status}\`;
+                logEntry.innerHTML = \`
+                    <strong>\${new Date(log.timestamp).toLocaleString('pt-BR')}</strong><br>
+                    \${log.message}
+                \`;
+                container.appendChild(logEntry);
+            });
+
+            // Scroll para o final
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Atualizar estatísticas
+        function updateStats(stats) {
+            document.getElementById('totalPayments').textContent = stats.total || 0;
+            document.getElementById('confirmedPayments').textContent = stats.confirmed || 0;
+            document.getElementById('pendingPayments').textContent = stats.pending || 0;
+            document.getElementById('failedPayments').textContent = stats.failed || 0;
+        }
+
+        // Atualizar pagamentos
+        function updatePayments(payments) {
+            const container = document.getElementById('recentPayments');
+            container.innerHTML = '';
+
+            if (payments.length === 0) {
+                container.innerHTML = \`
+                    <div class="payment-item payment-pending">
+                        <strong>Nenhum pagamento encontrado</strong><br>
+                        <small>Os pagamentos aparecerão aqui quando confirmados</small>
+                    </div>
+                \`;
+                return;
+            }
+
+            payments.slice(0, 5).forEach(payment => {
+                const paymentDiv = document.createElement('div');
+                const status = payment.paid ? 'confirmed' : 'pending';
+                paymentDiv.className = \`payment-item payment-\${status}\`;
+                paymentDiv.innerHTML = \`
+                    <strong>\${payment.sender || 'Usuário'} - \${payment.amount} \${payment.currency}</strong><br>
+                    <small>\${payment.content || 'Sem mensagem'}</small><br>
+                    <small class="timestamp">\${new Date(payment.timestamp).toLocaleString('pt-BR')}</small>
+                \`;
+                container.appendChild(paymentDiv);
+            });
+        }
+
+        // Atualizar status de conectividade
+        function updateConnectionStatus(isOnline) {
+            const statusElement = document.getElementById('connectionStatus');
+            if (isOnline) {
+                statusElement.textContent = 'ONLINE';
+                statusElement.className = 'status-value status-online';
+            } else {
+                statusElement.textContent = 'OFFLINE';
+                statusElement.className = 'status-value status-offline';
+            }
+        }
+
+        // Atualizar último check
+        function updateLastCheckTime() {
+            document.getElementById('lastCheck').textContent = new Date().toLocaleString('pt-BR');
+        }
+
+        // Mostrar/esconder loading
+        function showLoading(show) {
+            const loading = document.getElementById('loadingIndicator');
+            loading.style.display = show ? 'block' : 'none';
+        }
+
+        // Adicionar entrada de log
+        function addLogEntry(type, message) {
+            const container = document.getElementById('webhookLogs');
+            const logEntry = document.createElement('div');
+            logEntry.className = \`log-entry log-\${type}\`;
+            logEntry.innerHTML = \`
+                <strong>\${new Date().toLocaleString('pt-BR')}</strong><br>
+                \${message}
+            \`;
+            container.appendChild(logEntry);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Limpar logs
+        function clearLogs() {
+            const container = document.getElementById('webhookLogs');
+            container.innerHTML = '<div class="log-entry log-info">Logs limpos pelo usuário</div>';
+        }
+
+        // Testar webhook
+        async function testWebhook() {
+            addLogEntry('info', 'Enviando webhook de teste...');
+            
+            try {
+                const response = await fetch('/webhook', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Livetip-Webhook-Secret-Token': '0ac7b9aa00e75e0215243f3bb177c844'
+                    },
+                    body: JSON.stringify({
+                        event: 'payment_confirmed',
+                        payment: {
+                            sender: 'Teste Usuario',
+                            content: 'Webhook de teste',
+                            amount: 100,
+                            currency: 'BTC',
+                            timestamp: new Date().toISOString(),
+                            paid: true,
+                            paymentId: \`test_\${Date.now()}\`,
+                            read: false
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    addLogEntry('success', 'Webhook de teste enviado com sucesso');
+                    setTimeout(refreshData, 1000); // Atualizar após 1 segundo
+                } else {
+                    addLogEntry('error', 'Falha ao enviar webhook de teste');
+                }
+            } catch (error) {
+                addLogEntry('error', \`Erro no teste: \${error.message}\`);
+            }
+        }
+
+        // Toggle auto refresh
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('autoRefreshCheck');
+            const text = document.getElementById('autoRefreshText');
+            
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(refreshData, 5000);
+                text.textContent = '⏸️ Auto Refresh';
+                addLogEntry('info', 'Auto refresh ativado (5s)');
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+                text.textContent = '▶️ Auto Refresh';
+                addLogEntry('info', 'Auto refresh desativado');
+            }
+        }
+
+        // Inicializar página
+        document.addEventListener('DOMContentLoaded', function() {
+            addLogEntry('info', 'Webhook Monitor inicializado');
+            refreshData();
+            
+            // Auto refresh inicial desabilitado
+            document.getElementById('autoRefreshCheck').checked = false;
+        });
+
+        // Detectar quando a página volta a ficar ativa
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                refreshData();
+            }
+        });
+    </script>
+</body>
+</html>
         `);
         return;
     }

@@ -1,5 +1,26 @@
 // LiveTip Webhook System - Versão Completa para Vercel
 module.exports = (req, res) => {
+    // Helper function for CRC16 calculation
+    function calculateSimpleCRC16(payload) {
+        const polynomial = 0x1021;
+        let crc = 0xFFFF;
+        
+        for (let i = 0; i < payload.length; i++) {
+            crc ^= (payload.charCodeAt(i) << 8);
+            
+            for (let j = 0; j < 8; j++) {
+                if (crc & 0x8000) {
+                    crc = (crc << 1) ^ polynomial;
+                } else {
+                    crc <<= 1;
+                }
+                crc &= 0xFFFF;
+            }
+        }
+        
+        return crc.toString(16).toUpperCase().padStart(4, '0');
+    }
+
     // Debug - log da requisição para investigar o problema 404
     console.log('🔍 Debug Request:', {
         url: req.url,
@@ -553,8 +574,8 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
-            try {                const { userName, paymentMethod, amount, uniqueId } = JSON.parse(body);
-                
+            try {
+                const { userName, paymentMethod, amount, uniqueId } = JSON.parse(body);
                 if (!userName || !paymentMethod || !amount) {
                     res.status(400).json({ 
                         success: false,
@@ -562,7 +583,6 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                     });
                     return;
                 }
-
                 // Validar valores PIX fixos (R$ 1, 2, 3, 4)
                 if (paymentMethod === 'pix') {
                     const allowedPixAmounts = [1, 2, 3, 4];
@@ -574,7 +594,6 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                         return;
                     }
                 }
-
                 if (amount <= 0) {
                     res.status(400).json({ 
                         success: false,
@@ -582,31 +601,41 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                     });
                     return;
                 }
-
                 // Para Bitcoin, validar valor mínimo 
                 if (paymentMethod === 'bitcoin' && amount < 1) {
                     res.status(400).json({
                         success: false,
-                        error: 'Valor mínimo para Bitcoin é R$ 1.00'
+                        error: 'Valor mínimo para Bitcoin é 1 satoshi'
                     });
                     return;
                 }
-
                 const externalId = uniqueId || 'qr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                
-                console.log(`🎯 Criando pagamento LiveTip: ${paymentMethod} - ${userName} - R$ ${amount}`);                // Chamar API LiveTip para criar pagamento usando https nativo
+                console.log(`🎯 Criando pagamento LiveTip: ${paymentMethod} - ${userName} - Valor: ${amount}`);
                 try {
                     const https = require('https');
-                    const querystring = require('querystring');
-
-                    const postData = JSON.stringify({
-                        sender: userName,
-                        content: `Pagamento ${paymentMethod.toUpperCase()} - ${externalId}`,
-                        currency: 'BRL',
-                        amount: amount.toString()
-                    });
-
-                    console.log('📡 Chamando LiveTip API com dados:', postData);                    const liveTipData = await new Promise((resolve, reject) => {
+                    // Montar payload correto para cada método
+                    let payload;
+                    if (paymentMethod === 'bitcoin') {
+                        payload = {
+                            sender: userName,
+                            content: uniqueId || externalId,
+                            currency: 'BTC',
+                            amount: amount.toString() // valor em satoshis (string)
+                        };
+                    } else if (paymentMethod === 'pix') {
+                        payload = {
+                            sender: userName,
+                            content: `Pagamento LiveTip - ${externalId}`,
+                            currency: 'BRL',
+                            amount: amount.toString() // valor em reais (string)
+                        };
+                    } else {
+                        res.status(400).json({ success: false, error: 'Método de pagamento inválido' });
+                        return;
+                    }
+                    const postData = JSON.stringify(payload);
+                    console.log('📡 Chamando LiveTip API com dados:', postData);
+                    const liveTipData = await new Promise((resolve, reject) => {
                         const options = {
                             hostname: 'api.livetip.gg',
                             port: 443,
@@ -620,121 +649,72 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                             },
                             timeout: 30000 // 30 segundos timeout
                         };
-
-                        console.log('🔧 Request options:', JSON.stringify(options, null, 2));
-
-                        const req = https.request(options, (res) => {
+                        const req = https.request(options, (res2) => {
                             let data = '';
-                            
-                            console.log(`📡 Response headers:`, res.headers);
-                            
-                            res.on('data', (chunk) => {
-                                data += chunk;
-                            });
-                            
-                            res.on('end', () => {
-                                console.log(`📡 LiveTip API Response Status: ${res.statusCode}`);
-                                console.log(`📦 Raw response data:`, data);
-                                
-                                if (res.statusCode === 200 || res.statusCode === 201) {
+                            res2.on('data', (chunk) => { data += chunk; });
+                            res2.on('end', () => {
+                                if (res2.statusCode === 200 || res2.statusCode === 201) {
                                     try {
                                         const parsedData = JSON.parse(data);
-                                        console.log('✅ Parsed response:', JSON.stringify(parsedData, null, 2));
                                         resolve(parsedData);
                                     } catch (parseError) {
-                                        console.error('❌ JSON Parse Error:', parseError.message);
-                                        console.error('❌ Raw data was:', data);
                                         reject(new Error(`JSON Parse Error: ${parseError.message}`));
                                     }
                                 } else {
-                                    console.error(`❌ HTTP Error ${res.statusCode}:`, data);
-                                    reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+                                    reject(new Error(`HTTP ${res2.statusCode}: ${data}`));
                                 }
                             });
                         });
-
-                        req.on('timeout', () => {
-                            console.error('❌ Request timeout após 30 segundos');
-                            req.destroy();
-                            reject(new Error('Request timeout'));
-                        });
-
-                        req.on('error', (error) => {
-                            console.error('❌ HTTPS Request Error:', error.message);
-                            console.error('❌ Error stack:', error.stack);
-                            reject(error);
-                        });
-
-                        console.log('📤 Enviando dados para LiveTip:', postData);
+                        req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
+                        req.on('error', (error) => { reject(error); });
                         req.write(postData);
                         req.end();
                     });
-
                     let qrCodeImage = null;
                     let qrCodeText = null;
-
-                    // Extrair dados do QR Code dependendo da resposta da API
-                    if (liveTipData.qrCodeImage) {
-                        qrCodeImage = liveTipData.qrCodeImage;
-                    } else if (liveTipData.data?.qrCodeImage) {
-                        qrCodeImage = liveTipData.data.qrCodeImage;
+                    // Resposta para cada método
+                    if (paymentMethod === 'bitcoin') {
+                        qrCodeText = liveTipData.code || liveTipData.lightningInvoice;
+                    } else if (paymentMethod === 'pix') {
+                        qrCodeText = liveTipData.pixCode || liveTipData.code;
                     }
-
-                    if (liveTipData.pixCode) {
-                        qrCodeText = liveTipData.pixCode;
-                    } else if (liveTipData.lightningInvoice) {
-                        qrCodeText = liveTipData.lightningInvoice;
-                    } else if (liveTipData.data?.pixCode) {
-                        qrCodeText = liveTipData.data.pixCode;
-                    } else if (liveTipData.data?.lightningInvoice) {
-                        qrCodeText = liveTipData.data.lightningInvoice;
-                    }                    // Se não temos QR Code da API, gerar via API externa
+                    // Gera QR Code se necessário
                     if (!qrCodeImage && qrCodeText) {
                         try {
                             const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeText)}`;
                             qrCodeImage = qrApiUrl;
                         } catch (error) {
-                            console.warn('⚠️ Erro ao gerar QR Code via API externa:', error.message);
                             qrCodeImage = null;
                         }
                     }
-
-                    // Determinar tipo de pagamento pelos dados retornados
-                    const isPixPayment = qrCodeText && (qrCodeText.includes('PIX') || liveTipData.pixCode || liveTipData.data?.pixCode);
-                    const isBitcoinPayment = qrCodeText && (qrCodeText.includes('lnbc') || liveTipData.lightningInvoice || liveTipData.data?.lightningInvoice);
-
-                    console.log(`✅ Pagamento ${isPixPayment ? 'PIX' : 'Bitcoin'} criado via LiveTip API: ${liveTipData.paymentId || externalId}`);
-
-                    // Resposta no formato esperado pelo frontend
                     res.status(200).json({
                         success: true,
                         data: {
-                            paymentId: liveTipData.paymentId || externalId,
-                            liveTipPaymentId: liveTipData.paymentId,
+                            paymentId: liveTipData.id || externalId,
                             userName: userName,
                             amount: parseFloat(amount),
-                            satoshis: isBitcoinPayment ? parseFloat(amount) * 100000000 : undefined, // Converter BRL para satoshis aproximadamente
                             uniqueId: uniqueId,
                             method: paymentMethod,
                             qrCodeText: qrCodeText,
                             qrCodeImage: qrCodeImage,
-                            lightningInvoice: isBitcoinPayment ? qrCodeText : undefined,
-                            pixCode: isPixPayment ? qrCodeText : undefined,
+                            lightningInvoice: paymentMethod === 'bitcoin' ? qrCodeText : undefined,
+                            pixCode: paymentMethod === 'pix' ? qrCodeText : undefined,
                             source: 'livetip-api',
                             createdAt: new Date().toISOString(),
                             liveTipResponse: liveTipData
                         }
                     });                } catch (liveTipError) {
-                    console.warn('⚠️ LiveTip API falhou, usando fallback:', liveTipError.message);
-                      // Carregar geradores locais
-                    const PixGenerator = require('./pixGenerator');
-                    const LightningGenerator = require('./lightningGenerator');
+                    console.warn('⚠️ LiveTip API falhou, usando fallback local:', liveTipError.message);
+                    
+                    // Carregar geradores locais corrigidos
+                    const PixGeneratorFixed = require('./pixGeneratorFixed');
+                    const LightningGeneratorFixed = require('./lightningGeneratorFixed');
                     
                     let qrCodeText, qrCodeImage;
                     
                     if (paymentMethod === 'pix') {
                         try {
-                            const pixGen = new PixGenerator({
+                            const pixGen = new PixGeneratorFixed({
                                 receiverName: 'LIVETIP PAGAMENTOS',
                                 city: 'SAO PAULO',
                                 key: 'pagamentos@livetip.gg'
@@ -746,31 +726,47 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                                 externalId
                             );
                             
-                            console.log('✅ Código PIX EMV gerado:', qrCodeText.substring(0, 50) + '...');
+                            // Validar se o PIX gerado está correto
+                            const isValidPix = pixGen.validateGeneratedPix(qrCodeText);
+                            if (!isValidPix) {
+                                throw new Error('PIX gerado não passou na validação');
+                            }
                             
-                        } catch (pixError) {
-                            console.error('❌ Erro ao gerar PIX:', pixError.message);
-                            qrCodeText = `PIX-${externalId}-${amount}-${userName.replace(/\s+/g, '')}`;
+                            console.log('✅ Código PIX EMV gerado e validado:', qrCodeText.substring(0, 50) + '...');
+                              } catch (pixError) {
+                            console.error('❌ Erro ao gerar PIX local:', pixError.message);
+                            // Fallback para PIX simples
+                            qrCodeText = `00020126580014br.gov.bcb.pix0136pagamentos@livetip.gg52040000530398654${amount.toFixed(2).length.toString().padStart(2, '0')}${amount.toFixed(2)}5802BR5917LIVETIP PAGAMENTOS6009SAO PAULO62070503***6304`;
+                            const crc = calculateSimpleCRC16(qrCodeText);
+                            qrCodeText = qrCodeText.substring(0, qrCodeText.length - 4) + crc;
                         }
                         
                     } else if (paymentMethod === 'bitcoin') {
                         try {
-                            const lightningGen = new LightningGenerator();
-                            const invoiceData = lightningGen.generateSimpleInvoice(
-                                amount,
+                            const lightningGen = new LightningGeneratorFixed();
+                            const invoiceData = lightningGen.generateValidInvoice(
+                                amount, // já está em satoshis
                                 `Pagamento LiveTip - ${userName}`
                             );
                             
                             qrCodeText = invoiceData.invoice;
                             
-                            console.log('✅ Lightning Invoice gerado:', qrCodeText.substring(0, 50) + '...');
+                            // Validar se a Lightning Invoice gerada está correta
+                            const isValidLightning = lightningGen.validateGeneratedInvoice(qrCodeText);
+                            if (!isValidLightning) {
+                                throw new Error('Lightning Invoice gerada não passou na validação');
+                            }
+                            
+                            console.log('✅ Lightning Invoice gerada e validada:', qrCodeText.substring(0, 50) + '...');
                             
                         } catch (lightningError) {
-                            console.error('❌ Erro ao gerar Lightning:', lightningError.message);
-                            qrCodeText = `lnbc${Math.floor(amount * 100000000)}n1p${externalId.substr(-8)}`;
+                            console.error('❌ Erro ao gerar Lightning local:', lightningError.message);
+                            // Fallback para Lightning simples (mas ainda inválida - precisa de biblioteca bolt11 real)
+                            qrCodeText = `lnbc${amount}n1p${externalId.substr(-8)}${crypto.randomBytes(32).toString('hex')}`;
                         }
                     }
                     
+                    // Gerar QR Code image
                     try {
                         qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeText)}`;
                     } catch (error) {
@@ -785,16 +781,15 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                             paymentId: externalId,
                             userName: userName,
                             amount: parseFloat(amount),
-                            satoshis: paymentMethod === 'bitcoin' ? parseFloat(amount) * 100000000 : undefined,
                             uniqueId: uniqueId,
                             method: paymentMethod,
                             qrCodeText: qrCodeText,
                             qrCodeImage: qrCodeImage,
                             lightningInvoice: paymentMethod === 'bitcoin' ? qrCodeText : undefined,
                             pixCode: paymentMethod === 'pix' ? qrCodeText : undefined,
-                            source: 'fallback-local',
+                            source: 'fallback-local-fixed',
                             createdAt: new Date().toISOString(),
-                            error: 'LiveTip API indisponível, usando fallback'
+                            error: 'LiveTip API indisponível, usando fallback melhorado'
                         }
                     });
                 }

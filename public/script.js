@@ -7,17 +7,30 @@ const BITCOIN_CONFIG = {
     PREDEFINED_VALUES: [100, 200, 300, 400] // Valores em satoshis
 };
 
+// Configurações PIX - Valores em Reais
+const PIX_CONFIG = {
+    MIN_REAIS: 1,
+    PREDEFINED_VALUES: [1, 2, 3, 4] // Valores em reais
+};
+
 // Elementos do DOM
 const paymentForm = document.getElementById('payment-form');
 const qrCodeSection = document.getElementById('qrCodeSection');
 const paymentFormCard = document.getElementById('paymentForm');
 const loading = document.getElementById('loading');
 
-// Gerar identificador único
+// Gerar identificador único para Bitcoin
 function generateUniqueId() {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
     return `BTC_${timestamp}_${random}`.toUpperCase();
+}
+
+// Gerar identificador único para PIX
+function generatePixUniqueId() {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    return `PIX_${timestamp}_${random}`.toUpperCase();
 }
 
 // Atualizar interface baseada no método de pagamento
@@ -45,21 +58,32 @@ function updatePaymentInterface(paymentMethod) {
         satoshiValues.style.display = 'block';
         // Esconder botões PIX
         if (pixValues) pixValues.style.display = 'none';
+    } else if (paymentMethod === 'pix') {
+        // Mostrar campo de identificador único para PIX também
+        uniqueIdGroup.style.display = 'block';
+        currentUniqueId = generatePixUniqueId();
+        uniqueIdInput.value = currentUniqueId;
+        
+        // Alterar label para PIX (mantém em reais)
+        amountLabel.textContent = '💵 Valor (R$):';
+        amountInput.min = '1';
+        amountInput.step = '1';
+        amountInput.placeholder = '2';
+        
+        // Mostrar botões PIX
+        if (pixValues) pixValues.style.display = 'block';
+        // Esconder botões de satoshis
+        satoshiValues.style.display = 'none';
     } else {
-        // Esconder campo de identificador único
+        // Caso genérico (não deveria acontecer)
         uniqueIdGroup.style.display = 'none';
         currentUniqueId = null;
-        
-        // Voltar para BRL
         amountLabel.textContent = '💵 Valor (R$):';
         amountInput.min = '0.01';
         amountInput.step = '0.01';
         amountInput.placeholder = '10.00';
-        
-        // Esconder botões de satoshis
         satoshiValues.style.display = 'none';
-        // Mostrar botões PIX
-        if (pixValues) pixValues.style.display = 'block';
+        if (pixValues) pixValues.style.display = 'none';
     }
 }
 
@@ -70,17 +94,22 @@ paymentForm.addEventListener('submit', async (e) => {
     const formData = new FormData(paymentForm);
     const paymentMethod = formData.get('paymentMethod');
     const amount = parseFloat(formData.get('amount'));
-    
-    const data = {
+      const data = {
         userName: formData.get('userName'),
         amount: amount,
         paymentMethod: paymentMethod,
-        uniqueId: paymentMethod === 'bitcoin' ? currentUniqueId : null
+        uniqueId: currentUniqueId // Agora ambos Bitcoin e PIX têm uniqueId
     };
     
     // Validar valor mínimo para Bitcoin (em satoshis)
     if (paymentMethod === 'bitcoin' && amount < BITCOIN_CONFIG.MIN_SATOSHIS) {
         alert(`⚠️ Para pagamentos Bitcoin, o mínimo é ${BITCOIN_CONFIG.MIN_SATOSHIS} satoshis`);
+        return;
+    }
+    
+    // Validar valores PIX (R$ 1, 2, 3, 4)
+    if (paymentMethod === 'pix' && !PIX_CONFIG.PREDEFINED_VALUES.includes(amount)) {
+        alert(`⚠️ Para pagamentos PIX, selecione um dos valores: R$ ${PIX_CONFIG.PREDEFINED_VALUES.join(', ')}`);
         return;
     }
     
@@ -97,12 +126,11 @@ paymentForm.addEventListener('submit', async (e) => {
         
         const result = await response.json();
         
-        if (result.success) {
-            currentPaymentId = result.data.paymentId;
+        if (result.success) {            currentPaymentId = result.data.paymentId;
             displayPaymentResult(result.data);
             
-            // Salvar no histórico local se for Bitcoin
-            if (paymentMethod === 'bitcoin') {
+            // Salvar no histórico local para Bitcoin e PIX
+            if (paymentMethod === 'bitcoin' || paymentMethod === 'pix') {
                 saveToLocalHistory({
                     id: currentPaymentId,
                     uniqueId: currentUniqueId,
@@ -110,7 +138,7 @@ paymentForm.addEventListener('submit', async (e) => {
                     amount: amount,
                     status: 'pending',
                     timestamp: new Date().toISOString(),
-                    method: 'bitcoin'
+                    method: paymentMethod
                 });
             }
         } else {
@@ -123,9 +151,9 @@ paymentForm.addEventListener('submit', async (e) => {
     }
 });
 
-// Salvar no histórico local
+// Salvar no histórico local (Bitcoin e PIX)
 function saveToLocalHistory(payment) {
-    let history = JSON.parse(localStorage.getItem('bitcoinPayments') || '[]');
+    let history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
     
     // Verificar se já existe
     const existingIndex = history.findIndex(p => p.id === payment.id);
@@ -140,36 +168,43 @@ function saveToLocalHistory(payment) {
         history = history.slice(-100);
     }
     
-    localStorage.setItem('bitcoinPayments', JSON.stringify(history));
+    localStorage.setItem('paymentHistory', JSON.stringify(history));
 }
 
-// Carregar histórico de pagamentos
+// Carregar histórico de pagamentos (Bitcoin e PIX)
 function loadPaymentHistory() {
-    const history = JSON.parse(localStorage.getItem('bitcoinPayments') || '[]');
+    const history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
     const historyList = document.getElementById('historyList');
     const paymentStats = document.getElementById('paymentStats');
     
     if (history.length === 0) {
-        historyList.innerHTML = '<p style="text-align: center; color: #666;">Nenhum pagamento Bitcoin registrado ainda.</p>';
+        historyList.innerHTML = '<p style="text-align: center; color: #666;">Nenhum pagamento registrado ainda.</p>';
         paymentStats.innerHTML = '';
         return;
     }
     
-    // Estatísticas
+    // Estatísticas separadas por método
+    const bitcoinPayments = history.filter(p => p.method === 'bitcoin');
+    const pixPayments = history.filter(p => p.method === 'pix');
+    
     const totalPayments = history.length;
-    const totalSatoshis = history.reduce((sum, p) => sum + p.amount, 0);
+    const totalSatoshis = bitcoinPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPix = pixPayments.reduce((sum, p) => sum + p.amount, 0);
     const pendingPayments = history.filter(p => p.status === 'pending').length;
     const confirmedPayments = history.filter(p => p.status === 'confirmed').length;
-    
-    paymentStats.innerHTML = `
+      paymentStats.innerHTML = `
         <div class="stats-grid">
             <div class="stat-item">
                 <div class="stat-number">${totalPayments}</div>
                 <div class="stat-label">Total de Pagamentos</div>
             </div>
             <div class="stat-item">
-                <div class="stat-number">${totalSatoshis.toLocaleString()}</div>
-                <div class="stat-label">Total em Satoshis</div>
+                <div class="stat-number">${bitcoinPayments.length}</div>
+                <div class="stat-label">Bitcoin (${totalSatoshis.toLocaleString()} sats)</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">${pixPayments.length}</div>
+                <div class="stat-label">PIX (R$ ${totalPix.toFixed(2)})</div>
             </div>
             <div class="stat-item">
                 <div class="stat-number">${confirmedPayments}</div>
@@ -184,15 +219,15 @@ function loadPaymentHistory() {
     
     // Lista de pagamentos
     const sortedHistory = history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
-    historyList.innerHTML = `
+      historyList.innerHTML = `
         <table class="payment-table">
             <thead>
                 <tr>
                     <th>Data/Hora</th>
                     <th>Nome</th>
                     <th>ID Único</th>
-                    <th>Satoshis</th>
+                    <th>Método</th>
+                    <th>Valor</th>
                     <th>Status</th>
                     <th>Ações</th>
                 </tr>
@@ -203,7 +238,14 @@ function loadPaymentHistory() {
                         <td>${new Date(payment.timestamp).toLocaleString('pt-BR')}</td>
                         <td>${payment.userName}</td>
                         <td class="unique-id">${payment.uniqueId}</td>
-                        <td class="amount">${payment.amount.toLocaleString()} sats</td>
+                        <td class="method ${payment.method}">
+                            ${payment.method === 'bitcoin' ? '₿ Bitcoin' : '🏦 PIX'}
+                        </td>
+                        <td class="amount">
+                            ${payment.method === 'bitcoin' 
+                                ? `${payment.amount.toLocaleString()} sats` 
+                                : `R$ ${payment.amount.toFixed(2)}`}
+                        </td>
                         <td class="status ${payment.status}">
                             ${payment.status === 'confirmed' ? '✅ Confirmado' : 
                               payment.status === 'pending' ? '⏳ Pendente' : '❌ Falhou'}
@@ -225,15 +267,14 @@ async function checkPaymentStatus(paymentId) {
     try {
         const response = await fetch(`/payment-status/${paymentId}`);
         const result = await response.json();
-        
-        if (result.success) {
+          if (result.success) {
             // Atualizar status no histórico local
-            let history = JSON.parse(localStorage.getItem('bitcoinPayments') || '[]');
+            let history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
             const paymentIndex = history.findIndex(p => p.id === paymentId);
             
             if (paymentIndex >= 0) {
                 history[paymentIndex].status = result.status;
-                localStorage.setItem('bitcoinPayments', JSON.stringify(history));
+                localStorage.setItem('paymentHistory', JSON.stringify(history));
                 loadPaymentHistory(); // Recarregar a lista
             }
             
@@ -248,7 +289,7 @@ async function checkPaymentStatus(paymentId) {
 
 // Exportar dados de pagamentos
 function exportPayments() {
-    const history = JSON.parse(localStorage.getItem('bitcoinPayments') || '[]');
+    const history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
     
     if (history.length === 0) {
         alert('Nenhum pagamento para exportar.');
@@ -256,17 +297,19 @@ function exportPayments() {
     }
     
     const csvContent = [
-        'Data/Hora,Nome,ID Único,Satoshis,Status,Payment ID',
-        ...history.map(p => 
-            `"${new Date(p.timestamp).toLocaleString('pt-BR')}","${p.userName}","${p.uniqueId}",${p.amount},"${p.status}","${p.id}"`
-        )
+        'Data/Hora,Nome,ID Único,Método,Valor,Status,Payment ID',
+        ...history.map(p => {
+            const valorFormatado = p.paymentMethod === 'bitcoin' ? `${p.amount} sats` : `R$ ${p.amount}`;
+            const metodo = p.paymentMethod === 'bitcoin' ? 'Bitcoin' : 'PIX';
+            return `"${new Date(p.timestamp).toLocaleString('pt-BR')}","${p.userName}","${p.uniqueId}","${metodo}","${valorFormatado}","${p.status}","${p.id}"`;
+        })
     ].join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `bitcoin_payments_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `payments_history_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -276,7 +319,7 @@ function exportPayments() {
 // Limpar histórico
 function clearHistory() {
     if (confirm('⚠️ Tem certeza que deseja limpar todo o histórico de pagamentos? Esta ação não pode ser desfeita.')) {
-        localStorage.removeItem('bitcoinPayments');
+        localStorage.removeItem('paymentHistory');
         loadPaymentHistory();
         alert('✅ Histórico limpo com sucesso!');
     }

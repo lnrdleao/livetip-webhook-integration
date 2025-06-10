@@ -25,6 +25,7 @@ function updatePaymentInterface(paymentMethod) {
     const amountLabel = document.getElementById('amountLabel');
     const amountInput = document.getElementById('amount');
     const satoshiValues = document.getElementById('satoshiValues');
+    const pixValues = document.getElementById('pixValues');
     const uniqueIdGroup = document.getElementById('uniqueIdGroup');
     const uniqueIdInput = document.getElementById('uniqueId');
     
@@ -40,8 +41,10 @@ function updatePaymentInterface(paymentMethod) {
         amountInput.step = '1';
         amountInput.placeholder = '1000';
         
-        // Mostrar botões de valores pré-definidos
+        // Mostrar botões de valores pré-definidos Bitcoin
         satoshiValues.style.display = 'block';
+        // Esconder botões PIX
+        if (pixValues) pixValues.style.display = 'none';
     } else {
         // Esconder campo de identificador único
         uniqueIdGroup.style.display = 'none';
@@ -55,6 +58,8 @@ function updatePaymentInterface(paymentMethod) {
         
         // Esconder botões de satoshis
         satoshiValues.style.display = 'none';
+        // Mostrar botões PIX
+        if (pixValues) pixValues.style.display = 'block';
     }
 }
 
@@ -447,8 +452,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updatePaymentInterface(this.value);
         });
     });
-    
-    // Event listeners para botões de satoshis
+      // Event listeners para botões de satoshis
     const satoshiButtons = document.querySelectorAll('.satoshi-btn');
     satoshiButtons.forEach(button => {
         button.addEventListener('click', function() {
@@ -461,6 +465,33 @@ document.addEventListener('DOMContentLoaded', function() {
             // Atualizar visual dos botões
             satoshiButtons.forEach(btn => btn.classList.remove('selected'));
             this.classList.add('selected');
+            
+            // Feedback visual
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 150);
+        });
+    });    // Event listeners para botões PIX (R$ 1, 2, 3, 4) - Idêntico aos botões Satoshi
+    const pixButtons = document.querySelectorAll('.pix-btn');
+    pixButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const pixValue = parseInt(this.dataset.pix);
+            const amountInput = document.getElementById('amount');
+            
+            // Definir valor em reais
+            amountInput.value = pixValue;
+            
+            // Atualizar visual dos botões
+            pixButtons.forEach(btn => btn.classList.remove('selected'));
+            this.classList.add('selected');
+            
+            // Selecionar PIX automaticamente
+            const pixRadio = document.querySelector('input[name="paymentMethod"][value="pix"]');
+            if (pixRadio) {
+                pixRadio.checked = true;
+                updatePaymentInterface('pix');
+            }
             
             // Feedback visual
             this.style.transform = 'scale(0.95)';

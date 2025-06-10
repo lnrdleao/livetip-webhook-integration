@@ -553,8 +553,7 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
-            try {
-                const { userName, paymentMethod, amount, uniqueId } = JSON.parse(body);
+            try {                const { userName, paymentMethod, amount, uniqueId } = JSON.parse(body);
                 
                 if (!userName || !paymentMethod || !amount) {
                     res.status(400).json({ 
@@ -562,6 +561,18 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                         error: 'Nome do usuário, método de pagamento e valor são obrigatórios' 
                     });
                     return;
+                }
+
+                // Validar valores PIX fixos (R$ 1, 2, 3, 4)
+                if (paymentMethod === 'pix') {
+                    const allowedPixAmounts = [1, 2, 3, 4];
+                    if (!allowedPixAmounts.includes(Number(amount))) {
+                        res.status(400).json({
+                            success: false,
+                            error: 'Valor PIX deve ser R$ 1, 2, 3 ou 4'
+                        });
+                        return;
+                    }
                 }
 
                 if (amount <= 0) {
@@ -713,18 +724,51 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                             createdAt: new Date().toISOString(),
                             liveTipResponse: liveTipData
                         }
-                    });
-
-                } catch (liveTipError) {
+                    });                } catch (liveTipError) {
                     console.warn('⚠️ LiveTip API falhou, usando fallback:', liveTipError.message);
+                      // Carregar geradores locais
+                    const PixGenerator = require('./pixGenerator');
+                    const LightningGenerator = require('./lightningGenerator');
                     
-                    // Fallback: gerar pagamento local simples
                     let qrCodeText, qrCodeImage;
                     
                     if (paymentMethod === 'pix') {
-                        qrCodeText = `PIX-${externalId}-${amount}-${userName.replace(/\s+/g, '')}`;
+                        try {
+                            const pixGen = new PixGenerator({
+                                receiverName: 'LIVETIP PAGAMENTOS',
+                                city: 'SAO PAULO',
+                                key: 'pagamentos@livetip.gg'
+                            });
+                            
+                            qrCodeText = pixGen.generatePixCode(
+                                amount, 
+                                `Pagamento LiveTip - ${userName}`,
+                                externalId
+                            );
+                            
+                            console.log('✅ Código PIX EMV gerado:', qrCodeText.substring(0, 50) + '...');
+                            
+                        } catch (pixError) {
+                            console.error('❌ Erro ao gerar PIX:', pixError.message);
+                            qrCodeText = `PIX-${externalId}-${amount}-${userName.replace(/\s+/g, '')}`;
+                        }
+                        
                     } else if (paymentMethod === 'bitcoin') {
-                        qrCodeText = `lnbc${Math.floor(amount * 100000000)}n1p${externalId.substr(-8)}`;
+                        try {
+                            const lightningGen = new LightningGenerator();
+                            const invoiceData = lightningGen.generateSimpleInvoice(
+                                amount,
+                                `Pagamento LiveTip - ${userName}`
+                            );
+                            
+                            qrCodeText = invoiceData.invoice;
+                            
+                            console.log('✅ Lightning Invoice gerado:', qrCodeText.substring(0, 50) + '...');
+                            
+                        } catch (lightningError) {
+                            console.error('❌ Erro ao gerar Lightning:', lightningError.message);
+                            qrCodeText = `lnbc${Math.floor(amount * 100000000)}n1p${externalId.substr(-8)}`;
+                        }
                     }
                     
                     try {

@@ -496,6 +496,66 @@ header p {
     background: #218838;
 }
 
+/* Estilos para botões PIX de valores fixos - Idêntico aos botões Satoshi */
+.pix-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    margin-bottom: 1rem;
+}
+
+.pix-btn {
+    background: linear-gradient(135deg, #00d4aa 0%, #00b894 100%);
+    border: none;
+    border-radius: 10px;
+    padding: 15px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 15px rgba(0, 212, 170, 0.3);
+}
+
+.pix-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 212, 170, 0.4);
+}
+
+.pix-btn:active {
+    transform: translateY(0);
+}
+
+.pix-btn.selected {
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+}
+
+.pix-btn .reais {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-bottom: 5px;
+}
+
+.pix-info {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    border-left: 4px solid #00d4aa;
+    margin-top: 10px;
+}
+
+.pix-info p {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.pix-info p:last-child {
+    margin-bottom: 0;
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 10px;

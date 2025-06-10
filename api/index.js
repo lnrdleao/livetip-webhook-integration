@@ -583,44 +583,67 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
 
                 const externalId = uniqueId || 'qr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 
-                console.log(`🎯 Criando pagamento LiveTip: ${paymentMethod} - ${userName} - R$ ${amount}`);                // Chamar API LiveTip para criar pagamento
+                console.log(`🎯 Criando pagamento LiveTip: ${paymentMethod} - ${userName} - R$ ${amount}`);                // Chamar API LiveTip para criar pagamento usando https nativo
                 try {
-                    // Verificar se fetch está disponível
-                    if (typeof fetch === 'undefined') {
-                        throw new Error('Fetch não disponível no ambiente serverless');
-                    }
+                    const https = require('https');
+                    const querystring = require('querystring');
 
-                    console.log('📡 Chamando LiveTip API com dados:', {
+                    const postData = JSON.stringify({
                         sender: userName,
                         content: `Pagamento ${paymentMethod.toUpperCase()} - ${externalId}`,
                         currency: 'BRL',
                         amount: amount.toString()
                     });
 
-                    const liveTipResponse = await fetch('https://api.livetip.gg/api/v1/message/10', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'User-Agent': 'LiveTip-Webhook-Integration/1.0'
-                        },
-                        body: JSON.stringify({
-                            sender: userName,
-                            content: `Pagamento ${paymentMethod.toUpperCase()} - ${externalId}`,
-                            currency: 'BRL',
-                            amount: amount.toString()
-                        })
+                    console.log('📡 Chamando LiveTip API com dados:', postData);
+
+                    const liveTipData = await new Promise((resolve, reject) => {
+                        const options = {
+                            hostname: 'api.livetip.gg',
+                            port: 443,
+                            path: '/api/v1/message/10',
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Content-Length': Buffer.byteLength(postData),
+                                'User-Agent': 'LiveTip-Webhook-Integration/1.0'
+                            }
+                        };
+
+                        const req = https.request(options, (res) => {
+                            let data = '';
+                            
+                            res.on('data', (chunk) => {
+                                data += chunk;
+                            });
+                            
+                            res.on('end', () => {
+                                console.log(`📡 LiveTip API Response Status: ${res.statusCode}`);
+                                
+                                if (res.statusCode === 200 || res.statusCode === 201) {
+                                    try {
+                                        const parsedData = JSON.parse(data);
+                                        console.log('📦 Resposta LiveTip completa:', JSON.stringify(parsedData, null, 2));
+                                        resolve(parsedData);
+                                    } catch (parseError) {
+                                        console.error('❌ Erro ao fazer parse da resposta:', parseError.message);
+                                        reject(new Error('Resposta inválida da LiveTip API'));
+                                    }
+                                } else {
+                                    console.error(`❌ LiveTip API erro: ${res.statusCode} - ${data}`);
+                                    reject(new Error(`LiveTip API erro: ${res.statusCode} - ${data}`));
+                                }
+                            });
+                        });
+
+                        req.on('error', (error) => {
+                            console.error('❌ Erro na requisição para LiveTip:', error.message);
+                            reject(error);
+                        });
+
+                        req.write(postData);
+                        req.end();
                     });
-
-                    console.log(`📡 LiveTip API Response Status: ${liveTipResponse.status}`);
-
-                    if (!liveTipResponse.ok) {
-                        const errorText = await liveTipResponse.text();
-                        console.error(`❌ LiveTip API erro: ${liveTipResponse.status} - ${errorText}`);
-                        throw new Error(`LiveTip API erro: ${liveTipResponse.status} - ${errorText}`);
-                    }
-
-                    const liveTipData = await liveTipResponse.json();
-                    console.log('📦 Resposta LiveTip completa:', JSON.stringify(liveTipData, null, 2));
 
                     let qrCodeImage = null;
                     let qrCodeText = null;

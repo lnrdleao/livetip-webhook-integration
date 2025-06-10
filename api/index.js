@@ -548,8 +548,7 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             </html>
         `);
         return;    }
-    
-    // Endpoint para geração de QR Code
+      // Endpoint para geração de QR Code via API LiveTip
     if (url === '/generate-qr' && method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
@@ -573,84 +572,136 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                     return;
                 }
 
-                // Gerar ID único para o pagamento
+                // Para Bitcoin, validar valor mínimo 
+                if (paymentMethod === 'bitcoin' && amount < 1) {
+                    res.status(400).json({
+                        success: false,
+                        error: 'Valor mínimo para Bitcoin é R$ 1.00'
+                    });
+                    return;
+                }
+
                 const externalId = uniqueId || 'qr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 
-                console.log(`🎯 Gerando QR Code: ${paymentMethod} - ${userName} - ${amount}`);
+                console.log(`🎯 Criando pagamento LiveTip: ${paymentMethod} - ${userName} - R$ ${amount}`);
 
-                let qrData;
-                let paymentData = {
-                    id: externalId,
-                    userName,
-                    method: paymentMethod,
-                    amount,
-                    status: 'pending',
-                    source: 'serverless',
-                    createdAt: new Date().toISOString()
-                };
-
-                if (paymentMethod === 'pix') {
-                    // Gerar código PIX simples (sem QR complexo)
-                    const pixCode = `PIX-${externalId}-${amount}-${userName.replace(/\s+/g, '')}`;
-                    qrData = pixCode;
-                    paymentData.pixCode = pixCode;
-                    
-                    console.log(`💚 PIX gerado: R$ ${amount} para ${userName}`);
-                    
-                } else if (paymentMethod === 'bitcoin') {
-                    // Validar valor mínimo em satoshis
-                    if (amount < 100) {
-                        res.status(400).json({
-                            success: false,
-                            error: 'Valor mínimo para Bitcoin é 100 satoshis'
-                        });
-                        return;
-                    }
-                    
-                    // Gerar Lightning Invoice simples (sem conexão real)
-                    const lightningInvoice = `lnbc${amount}u1p${externalId.substr(-8)}`;
-                    qrData = lightningInvoice;
-                    paymentData.lightningInvoice = lightningInvoice;
-                    paymentData.satoshis = amount;
-                    paymentData.uniqueId = uniqueId;
-                    
-                    console.log(`⚡ Bitcoin gerado: ${amount} satoshis para ${userName}`);
-                }
-
-                // Gerar QR Code simples usando API externa
-                let qrCodeImage = null;
+                // Chamar API LiveTip para criar pagamento
                 try {
-                    // Usar API pública gratuita para gerar QR Code
-                    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-                    qrCodeImage = qrApiUrl; // URL da imagem do QR Code
-                    
-                } catch (error) {
-                    console.warn('⚠️ Erro ao gerar QR Code via API externa:', error.message);
-                    qrCodeImage = `data:text/plain;base64,${Buffer.from(qrData).toString('base64')}`;
-                }
+                    const liveTipResponse = await fetch('https://api.livetip.gg/api/v1/message/10', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            sender: userName,
+                            content: `Pagamento ${paymentMethod.toUpperCase()} - ${externalId}`,
+                            currency: 'BRL',
+                            amount: amount.toString()
+                        })
+                    });
 
-                paymentData.qrCodeImage = qrCodeImage;
-
-                // Resposta no formato esperado
-                res.status(200).json({
-                    success: true,
-                    data: {
-                        paymentId: externalId,
-                        userName: userName,
-                        amount: amount,
-                        satoshis: paymentMethod === 'bitcoin' ? amount : undefined,
-                        uniqueId: uniqueId,
-                        method: paymentMethod,
-                        qrCodeText: qrData,
-                        qrCodeImage: qrCodeImage,
-                        lightningInvoice: paymentData.lightningInvoice,
-                        pixCode: paymentData.pixCode,
-                        source: 'serverless-simple',
-                        createdAt: paymentData.createdAt
+                    if (!liveTipResponse.ok) {
+                        throw new Error(`LiveTip API erro: ${liveTipResponse.status}`);
                     }
-                });
 
-                console.log(`✅ QR Code gerado com sucesso: ${externalId}`);
+                    const liveTipData = await liveTipResponse.json();
+                    console.log('📦 Resposta LiveTip:', JSON.stringify(liveTipData, null, 2));
+
+                    let qrCodeImage = null;
+                    let qrCodeText = null;
+
+                    // Extrair dados do QR Code dependendo da resposta da API
+                    if (liveTipData.qrCodeImage) {
+                        qrCodeImage = liveTipData.qrCodeImage;
+                    } else if (liveTipData.data?.qrCodeImage) {
+                        qrCodeImage = liveTipData.data.qrCodeImage;
+                    }
+
+                    if (liveTipData.pixCode) {
+                        qrCodeText = liveTipData.pixCode;
+                    } else if (liveTipData.lightningInvoice) {
+                        qrCodeText = liveTipData.lightningInvoice;
+                    } else if (liveTipData.data?.pixCode) {
+                        qrCodeText = liveTipData.data.pixCode;
+                    } else if (liveTipData.data?.lightningInvoice) {
+                        qrCodeText = liveTipData.data.lightningInvoice;
+                    }                    // Se não temos QR Code da API, gerar via API externa
+                    if (!qrCodeImage && qrCodeText) {
+                        try {
+                            const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeText)}`;
+                            qrCodeImage = qrApiUrl;
+                        } catch (error) {
+                            console.warn('⚠️ Erro ao gerar QR Code via API externa:', error.message);
+                            qrCodeImage = null;
+                        }
+                    }
+
+                    // Determinar tipo de pagamento pelos dados retornados
+                    const isPixPayment = qrCodeText && (qrCodeText.includes('PIX') || liveTipData.pixCode || liveTipData.data?.pixCode);
+                    const isBitcoinPayment = qrCodeText && (qrCodeText.includes('lnbc') || liveTipData.lightningInvoice || liveTipData.data?.lightningInvoice);
+
+                    console.log(`✅ Pagamento ${isPixPayment ? 'PIX' : 'Bitcoin'} criado via LiveTip API: ${liveTipData.paymentId || externalId}`);
+
+                    // Resposta no formato esperado pelo frontend
+                    res.status(200).json({
+                        success: true,
+                        data: {
+                            paymentId: liveTipData.paymentId || externalId,
+                            liveTipPaymentId: liveTipData.paymentId,
+                            userName: userName,
+                            amount: parseFloat(amount),
+                            satoshis: isBitcoinPayment ? parseFloat(amount) * 100000000 : undefined, // Converter BRL para satoshis aproximadamente
+                            uniqueId: uniqueId,
+                            method: paymentMethod,
+                            qrCodeText: qrCodeText,
+                            qrCodeImage: qrCodeImage,
+                            lightningInvoice: isBitcoinPayment ? qrCodeText : undefined,
+                            pixCode: isPixPayment ? qrCodeText : undefined,
+                            source: 'livetip-api',
+                            createdAt: new Date().toISOString(),
+                            liveTipResponse: liveTipData
+                        }
+                    });
+
+                } catch (liveTipError) {
+                    console.warn('⚠️ LiveTip API falhou, usando fallback:', liveTipError.message);
+                    
+                    // Fallback: gerar pagamento local simples
+                    let qrCodeText, qrCodeImage;
+                    
+                    if (paymentMethod === 'pix') {
+                        qrCodeText = `PIX-${externalId}-${amount}-${userName.replace(/\s+/g, '')}`;
+                    } else if (paymentMethod === 'bitcoin') {
+                        qrCodeText = `lnbc${Math.floor(amount * 100000000)}n1p${externalId.substr(-8)}`;
+                    }
+                    
+                    try {
+                        qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeText)}`;
+                    } catch (error) {
+                        qrCodeImage = null;
+                    }
+
+                    console.log(`✅ Fallback ${paymentMethod} gerado: ${externalId}`);
+
+                    res.status(200).json({
+                        success: true,
+                        data: {
+                            paymentId: externalId,
+                            userName: userName,
+                            amount: parseFloat(amount),
+                            satoshis: paymentMethod === 'bitcoin' ? parseFloat(amount) * 100000000 : undefined,
+                            uniqueId: uniqueId,
+                            method: paymentMethod,
+                            qrCodeText: qrCodeText,
+                            qrCodeImage: qrCodeImage,
+                            lightningInvoice: paymentMethod === 'bitcoin' ? qrCodeText : undefined,
+                            pixCode: paymentMethod === 'pix' ? qrCodeText : undefined,
+                            source: 'fallback-local',
+                            createdAt: new Date().toISOString(),
+                            error: 'LiveTip API indisponível, usando fallback'
+                        }
+                    });
+                }
 
             } catch (error) {
                 console.error('❌ Erro ao processar generate-qr:', error.message);
@@ -659,6 +710,58 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                     message: error.message,
                     timestamp: new Date().toISOString()
                 });
+            }
+        });
+        return;    }
+    
+    // Endpoint para verificar status de pagamento
+    if (url.startsWith('/payment-status/') && method === 'GET') {
+        const paymentId = url.split('/payment-status/')[1];
+        
+        if (!paymentId) {
+            res.status(400).json({
+                success: false,
+                error: 'ID do pagamento é obrigatório'
+            });
+            return;
+        }
+
+        console.log(`🔍 Verificando status do pagamento: ${paymentId}`);
+
+        // Por enquanto, retorna status pending - será atualizado pelo webhook
+        res.status(200).json({
+            success: true,
+            data: {
+                paymentId: paymentId,
+                status: 'pending',
+                message: 'Aguardando confirmação de pagamento',
+                timestamp: new Date().toISOString()
+            }
+        });
+        return;
+    }
+    
+    // Endpoint para simular pagamento confirmado (para testes)
+    if (url.startsWith('/confirm-payment/') && method === 'POST') {
+        const paymentId = url.split('/confirm-payment/')[1];
+        
+        if (!paymentId) {
+            res.status(400).json({
+                success: false,
+                error: 'ID do pagamento é obrigatório'
+            });
+            return;
+        }
+
+        console.log(`✅ Simulando confirmação de pagamento: ${paymentId}`);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                paymentId: paymentId,
+                status: 'confirmed',
+                message: '🎉 Pagamento confirmado com sucesso!',
+                confirmedAt: new Date().toISOString()
             }
         });
         return;
@@ -675,7 +778,9 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             'GET /monitor',
             'GET /webhook-monitor',
             'GET /control',
-            'POST /generate-qr'
+            'POST /generate-qr',
+            'GET /payment-status/{paymentId}',
+            'POST /confirm-payment/{paymentId}'
         ],
         timestamp: new Date().toISOString(),
         url_requested: url,

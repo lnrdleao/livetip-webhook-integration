@@ -547,12 +547,126 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             </body>
             </html>
         `);
+        return;    }
+    
+    // Endpoint para geração de QR Code
+    if (url === '/generate-qr' && method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            try {
+                const { userName, paymentMethod, amount, uniqueId } = JSON.parse(body);
+                
+                if (!userName || !paymentMethod || !amount) {
+                    res.status(400).json({ 
+                        success: false,
+                        error: 'Nome do usuário, método de pagamento e valor são obrigatórios' 
+                    });
+                    return;
+                }
+
+                if (amount <= 0) {
+                    res.status(400).json({ 
+                        success: false,
+                        error: 'Valor deve ser maior que zero' 
+                    });
+                    return;
+                }
+
+                // Gerar ID único para o pagamento
+                const externalId = uniqueId || 'qr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                console.log(`🎯 Gerando QR Code: ${paymentMethod} - ${userName} - ${amount}`);
+
+                let qrData;
+                let paymentData = {
+                    id: externalId,
+                    userName,
+                    method: paymentMethod,
+                    amount,
+                    status: 'pending',
+                    source: 'serverless',
+                    createdAt: new Date().toISOString()
+                };
+
+                if (paymentMethod === 'pix') {
+                    // Gerar código PIX simples (sem QR complexo)
+                    const pixCode = `PIX-${externalId}-${amount}-${userName.replace(/\s+/g, '')}`;
+                    qrData = pixCode;
+                    paymentData.pixCode = pixCode;
+                    
+                    console.log(`💚 PIX gerado: R$ ${amount} para ${userName}`);
+                    
+                } else if (paymentMethod === 'bitcoin') {
+                    // Validar valor mínimo em satoshis
+                    if (amount < 100) {
+                        res.status(400).json({
+                            success: false,
+                            error: 'Valor mínimo para Bitcoin é 100 satoshis'
+                        });
+                        return;
+                    }
+                    
+                    // Gerar Lightning Invoice simples (sem conexão real)
+                    const lightningInvoice = `lnbc${amount}u1p${externalId.substr(-8)}`;
+                    qrData = lightningInvoice;
+                    paymentData.lightningInvoice = lightningInvoice;
+                    paymentData.satoshis = amount;
+                    paymentData.uniqueId = uniqueId;
+                    
+                    console.log(`⚡ Bitcoin gerado: ${amount} satoshis para ${userName}`);
+                }
+
+                // Gerar QR Code simples usando API externa
+                let qrCodeImage = null;
+                try {
+                    // Usar API pública gratuita para gerar QR Code
+                    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+                    qrCodeImage = qrApiUrl; // URL da imagem do QR Code
+                    
+                } catch (error) {
+                    console.warn('⚠️ Erro ao gerar QR Code via API externa:', error.message);
+                    qrCodeImage = `data:text/plain;base64,${Buffer.from(qrData).toString('base64')}`;
+                }
+
+                paymentData.qrCodeImage = qrCodeImage;
+
+                // Resposta no formato esperado
+                res.status(200).json({
+                    success: true,
+                    data: {
+                        paymentId: externalId,
+                        userName: userName,
+                        amount: amount,
+                        satoshis: paymentMethod === 'bitcoin' ? amount : undefined,
+                        uniqueId: uniqueId,
+                        method: paymentMethod,
+                        qrCodeText: qrData,
+                        qrCodeImage: qrCodeImage,
+                        lightningInvoice: paymentData.lightningInvoice,
+                        pixCode: paymentData.pixCode,
+                        source: 'serverless-simple',
+                        createdAt: paymentData.createdAt
+                    }
+                });
+
+                console.log(`✅ QR Code gerado com sucesso: ${externalId}`);
+
+            } catch (error) {
+                console.error('❌ Erro ao processar generate-qr:', error.message);
+                res.status(400).json({ 
+                    error: 'Dados JSON inválidos ou erro no processamento',
+                    message: error.message,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
         return;
     }
-      // 404 para rotas não encontradas
+    
+    // 404 para rotas não encontradas
     res.status(404).json({
-        error: 'Endpoint não encontrado',
-        available_endpoints: [
+        error: 'Endpoint não encontrado',        available_endpoints: [
             'GET /',
             'GET /health', 
             'GET /webhook',
@@ -560,7 +674,8 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             'GET /docs',
             'GET /monitor',
             'GET /webhook-monitor',
-            'GET /control'
+            'GET /control',
+            'POST /generate-qr'
         ],
         timestamp: new Date().toISOString(),
         url_requested: url,

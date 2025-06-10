@@ -583,14 +583,25 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
 
                 const externalId = uniqueId || 'qr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 
-                console.log(`🎯 Criando pagamento LiveTip: ${paymentMethod} - ${userName} - R$ ${amount}`);
-
-                // Chamar API LiveTip para criar pagamento
+                console.log(`🎯 Criando pagamento LiveTip: ${paymentMethod} - ${userName} - R$ ${amount}`);                // Chamar API LiveTip para criar pagamento
                 try {
+                    // Verificar se fetch está disponível
+                    if (typeof fetch === 'undefined') {
+                        throw new Error('Fetch não disponível no ambiente serverless');
+                    }
+
+                    console.log('📡 Chamando LiveTip API com dados:', {
+                        sender: userName,
+                        content: `Pagamento ${paymentMethod.toUpperCase()} - ${externalId}`,
+                        currency: 'BRL',
+                        amount: amount.toString()
+                    });
+
                     const liveTipResponse = await fetch('https://api.livetip.gg/api/v1/message/10', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'User-Agent': 'LiveTip-Webhook-Integration/1.0'
                         },
                         body: JSON.stringify({
                             sender: userName,
@@ -600,12 +611,16 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                         })
                     });
 
+                    console.log(`📡 LiveTip API Response Status: ${liveTipResponse.status}`);
+
                     if (!liveTipResponse.ok) {
-                        throw new Error(`LiveTip API erro: ${liveTipResponse.status}`);
+                        const errorText = await liveTipResponse.text();
+                        console.error(`❌ LiveTip API erro: ${liveTipResponse.status} - ${errorText}`);
+                        throw new Error(`LiveTip API erro: ${liveTipResponse.status} - ${errorText}`);
                     }
 
                     const liveTipData = await liveTipResponse.json();
-                    console.log('📦 Resposta LiveTip:', JSON.stringify(liveTipData, null, 2));
+                    console.log('📦 Resposta LiveTip completa:', JSON.stringify(liveTipData, null, 2));
 
                     let qrCodeImage = null;
                     let qrCodeText = null;

@@ -131,4 +131,4 @@ https://github.com/lnrdleao/livetip-webhook-integration
 **Data do Deploy**: 10 de junho de 2025  
 **Versão**: v3.1 - PIX + Bitcoin Completo  
 **Status**: 🟢 LIVE EM PRODUÇÃO  
-**URL Principal**: https://livetip-webhook-integration.vercel.app
+**URL Principal**: https://webhook-test-mozu3wq3q-leonardos-projects-b4a462ee.vercel.app

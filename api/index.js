@@ -379,12 +379,10 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             </html>
         `);
         return;
-    }
-      // Webhook Monitor avançado
+    }    // Webhook Monitor - Versão EXATA do localhost:3001
     if (url === '/webhook-monitor' && method === 'GET') {
         res.setHeader('Content-Type', 'text/html');
-        res.status(200).send(`
-<!DOCTYPE html>
+        res.status(200).send(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -435,71 +433,105 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             padding: 1.5rem;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             text-align: center;
-            transform: translateY(0);
-            transition: all 0.3s ease;
         }
 
-        .status-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
-        }
-
-        .status-icon {
-            font-size: 3rem;
+        .status-card h3 {
+            color: #2c3e50;
             margin-bottom: 1rem;
         }
 
-        .status-title {
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
         }
 
-        .status-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
+        .status-online { background: #27ae60; }
+        .status-offline { background: #e74c3c; }
+        .status-warning { background: #f39c12; }
 
-        .status-online {
-            color: #28a745;
-        }
-
-        .status-offline {
-            color: #dc3545;
-        }
-
-        .status-warning {
-            color: #ffc107;
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
         }
 
         .card {
             background: white;
             border-radius: 15px;
             padding: 2rem;
-            margin-bottom: 2rem;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
 
         .card h2 {
+            color: #2c3e50;
             margin-bottom: 1.5rem;
-            color: #333;
-            font-size: 1.5rem;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 0.5rem;
+        }
+
+        .webhook-log {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ecf0f1;
+            border-radius: 8px;
+            padding: 1rem;
+            background: #f8f9fa;
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .log-success { background: #d4edda; color: #155724; }
+        .log-error { background: #f8d7da; color: #721c24; }
+        .log-warning { background: #fff3cd; color: #856404; }
+        .log-info { background: #d1ecf1; color: #0c5460; }
+
+        .payment-item {
+            padding: 1rem;
+            border: 1px solid #ecf0f1;
+            border-radius: 8px;
+            margin: 0.5rem 0;
+            transition: all 0.3s ease;
+        }
+
+        .payment-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .payment-confirmed {
+            border-left: 4px solid #27ae60;
+            background: #d4edda;
+        }
+
+        .payment-pending {
+            border-left: 4px solid #f39c12;
+            background: #fff3cd;
+        }
+
+        .payment-failed {
+            border-left: 4px solid #e74c3c;
+            background: #f8d7da;
         }
 
         .controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            align-items: center;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
         }
 
         .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
             cursor: pointer;
             margin: 0 5px;
             font-size: 16px;
@@ -551,69 +583,22 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
             margin: 1rem 0;
-        }
-
-        .checkbox-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .checkbox-wrapper input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-        }
-
-        .log-container {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 1rem;
-            background: #f8f9fa;
-        }
-
-        .log-entry {
-            padding: 8px 12px;
-            margin-bottom: 5px;
-            border-radius: 5px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-        }
-
-        .log-success {
-            background: #d4edda;
-            color: #155724;
-            border-left: 4px solid #28a745;
-        }
-
-        .log-error {
-            background: #f8d7da;
-            color: #721c24;
-            border-left: 4px solid #dc3545;
-        }
-
-        .log-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border-left: 4px solid #17a2b8;
         }
 
         .loading {
             display: none;
             text-align: center;
-            padding: 20px;
-            color: #667eea;
+            color: white;
+            font-size: 1.1rem;
         }
 
         .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+            border: 4px solid rgba(255,255,255,0.3);
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            border-top: 4px solid white;
+            width: 30px;
+            height: 30px;
             animation: spin 1s linear infinite;
             margin: 0 auto 10px;
         }
@@ -623,43 +608,13 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             100% { transform: rotate(360deg); }
         }
 
-        .payment-item {
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-
-        .payment-confirmed {
-            background: #d4edda;
-            border-left-color: #28a745;
-        }
-
-        .payment-pending {
-            background: #fff3cd;
-            border-left-color: #ffc107;
-        }
-
-        .payment-failed {
-            background: #f8d7da;
-            border-left-color: #dc3545;
-        }
-
         @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            
-            .header h1 {
-                font-size: 2rem;
+            .main-content {
+                grid-template-columns: 1fr;
             }
             
             .status-cards {
                 grid-template-columns: 1fr;
-            }
-            
-            .controls {
-                justify-content: center;
             }
         }
     </style>
@@ -668,59 +623,64 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
     <div class="container">
         <div class="header">
             <h1>🎯 Webhook Monitor - LiveTip</h1>
-            <p>Monitor em tempo real dos webhooks e pagamentos</p>
+            <p>Monitoramento em tempo real de confirmações de pagamento</p>
         </div>
 
         <!-- Status Cards -->
         <div class="status-cards">
             <div class="status-card">
-                <div class="status-icon">🌐</div>
-                <div class="status-title">Conectividade</div>
-                <div class="status-value status-online" id="connectionStatus">ONLINE</div>
+                <h3>📡 Status do Webhook</h3>
+                <span class="status-indicator status-online" id="webhookStatus"></span>
+                <span id="webhookStatusText">Online</span>
+                <div class="timestamp" id="lastWebhookTime">Último webhook: Nunca</div>
             </div>
             
             <div class="status-card">
-                <div class="status-icon">📡</div>
-                <div class="status-title">Último Webhook</div>
-                <div class="status-value" id="lastWebhook">Aguardando...</div>
+                <h3>🔗 Conectividade</h3>
+                <span class="status-indicator status-online" id="connectionStatus"></span>
+                <span id="connectionStatusText">Conectado</span>
+                <div class="timestamp" id="lastCheckTime">Última verificação: Agora</div>
             </div>
             
             <div class="status-card">
-                <div class="status-icon">⏱️</div>
-                <div class="status-title">Última Verificação</div>
-                <div class="status-value" id="lastCheck">${new Date().toLocaleString('pt-BR')}</div>
+                <h3>📊 Estatísticas</h3>
+                <div id="totalWebhooks" class="stat-number">0</div>
+                <div>Total de webhooks</div>
             </div>
         </div>
 
         <!-- Controls -->
-        <div class="card">
-            <h2>🎛️ Controles</h2>
-            <div class="controls">
-                <button class="btn" onclick="refreshData()">🔄 Atualizar</button>
-                <button class="btn btn-success" onclick="testWebhook()">🧪 Testar Webhook</button>
-                <button class="btn btn-secondary" onclick="clearLogs()">🗑️ Limpar Logs</button>
-                
-                <div class="auto-refresh">
-                    <div class="checkbox-wrapper">
-                        <input type="checkbox" id="autoRefreshCheck" onchange="toggleAutoRefresh()">
-                        <label for="autoRefreshCheck" id="autoRefreshText">▶️ Auto Refresh (5s)</label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="loading" id="loadingIndicator">
-                <div class="spinner"></div>
-                <div>Carregando dados...</div>
-            </div>
+        <div class="controls">
+            <button class="btn" onclick="refreshData()">🔄 Atualizar</button>
+            <button class="btn btn-secondary" onclick="clearLogs()">🗑️ Limpar Logs</button>
+            <button class="btn btn-success" onclick="testWebhook()">🧪 Testar Webhook</button>
+            <button class="btn btn-danger" onclick="toggleAutoRefresh()">
+                <span id="autoRefreshText">▶️ Auto Refresh</span>
+            </button>
         </div>
 
-        <!-- Two Column Layout -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+        <div class="auto-refresh">
+            <label>
+                <input type="checkbox" id="autoRefreshCheck" onchange="toggleAutoRefresh()">
+                Atualização automática (5s)
+            </label>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Atualizando dados...</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
             <!-- Webhook Logs -->
             <div class="card">
-                <h2>📋 Logs do Webhook</h2>
-                <div class="log-container" id="webhookLogs">
-                    <div class="log-entry log-info">Sistema iniciado - Aguardando webhooks...</div>
+                <h2>📜 Logs do Webhook</h2>
+                <div class="webhook-log" id="webhookLogs">
+                    <div class="log-entry log-info">
+                        <strong>Sistema inicializado</strong><br>
+                        Aguardando webhooks do LiveTip...
+                    </div>
                 </div>
             </div>
 
@@ -826,24 +786,34 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
 
             logs.forEach(log => {
                 const logEntry = document.createElement('div');
-                logEntry.className = \`log-entry log-\${log.status}\`;
+                logEntry.className = \`log-entry log-\${getLogClass(log.status)}\`;
+                
+                const timestamp = new Date(log.timestamp).toLocaleString('pt-BR');
                 logEntry.innerHTML = \`
-                    <strong>\${new Date(log.timestamp).toLocaleString('pt-BR')}</strong><br>
-                    \${log.message}
+                    <strong>\${log.event}</strong> - \${log.status}<br>
+                    <small>\${timestamp}</small><br>
+                    <small>\${log.data ? JSON.parse(log.data).sender || 'N/A' : 'N/A'}</small>
                 \`;
+                
                 container.appendChild(logEntry);
             });
 
-            // Scroll para o final
-            container.scrollTop = container.scrollHeight;
+            // Atualizar último webhook
+            if (logs.length > 0) {
+                lastWebhookTime = new Date(logs[0].timestamp);
+                updateWebhookStatus(true);
+            }
         }
 
         // Atualizar estatísticas
         function updateStats(stats) {
-            document.getElementById('totalPayments').textContent = stats.total || 0;
-            document.getElementById('confirmedPayments').textContent = stats.confirmed || 0;
-            document.getElementById('pendingPayments').textContent = stats.pending || 0;
-            document.getElementById('failedPayments').textContent = stats.failed || 0;
+            document.getElementById('totalWebhooks').textContent = stats.totalWebhooks || 0;
+            document.getElementById('totalPayments').textContent = stats.totalPayments || 0;
+            
+            const paymentStats = stats.paymentStats || {};
+            document.getElementById('confirmedPayments').textContent = paymentStats.completed || 0;
+            document.getElementById('pendingPayments').textContent = paymentStats.pending || 0;
+            document.getElementById('failedPayments').textContent = paymentStats.failed || 0;
         }
 
         // Atualizar pagamentos
@@ -852,81 +822,115 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
             container.innerHTML = '';
 
             if (payments.length === 0) {
-                container.innerHTML = \`
-                    <div class="payment-item payment-pending">
-                        <strong>Nenhum pagamento encontrado</strong><br>
-                        <small>Os pagamentos aparecerão aqui quando confirmados</small>
-                    </div>
-                \`;
+                container.innerHTML = '<div class="payment-item">Nenhum pagamento encontrado</div>';
                 return;
             }
 
-            payments.slice(0, 5).forEach(payment => {
+            // Mostrar últimos 10 pagamentos
+            payments.slice(-10).reverse().forEach(payment => {
                 const paymentDiv = document.createElement('div');
-                const status = payment.paid ? 'confirmed' : 'pending';
-                paymentDiv.className = \`payment-item payment-\${status}\`;
+                paymentDiv.className = \`payment-item payment-\${payment.status}\`;
+                
+                const timestamp = new Date(payment.createdAt).toLocaleString('pt-BR');
+                const amount = payment.method === 'bitcoin' ? 
+                    \`\${payment.satoshis || payment.amount} sats\` : 
+                    \`R$ \${payment.amount}\`;
+                
                 paymentDiv.innerHTML = \`
-                    <strong>\${payment.sender || 'Usuário'} - \${payment.amount} \${payment.currency}</strong><br>
-                    <small>\${payment.content || 'Sem mensagem'}</small><br>
-                    <small class="timestamp">\${new Date(payment.timestamp).toLocaleString('pt-BR')}</small>
+                    <strong>\${payment.userName}</strong> - \${payment.method.toUpperCase()}<br>
+                    <strong>Valor:</strong> \${amount}<br>
+                    <strong>Status:</strong> \${payment.status}<br>
+                    <small>ID: \${payment.id}</small><br>
+                    <small>\${timestamp}</small>
                 \`;
+                
                 container.appendChild(paymentDiv);
             });
         }
 
-        // Atualizar status de conectividade
-        function updateConnectionStatus(isOnline) {
-            const statusElement = document.getElementById('connectionStatus');
-            if (isOnline) {
-                statusElement.textContent = 'ONLINE';
-                statusElement.className = 'status-value status-online';
-            } else {
-                statusElement.textContent = 'OFFLINE';
-                statusElement.className = 'status-value status-offline';
+        // Função para determinar classe do log
+        function getLogClass(status) {
+            switch (status) {
+                case 'success': return 'success';
+                case 'error': return 'error';
+                case 'received': return 'info';
+                default: return 'warning';
             }
         }
 
-        // Atualizar último check
+        // Atualizar status do webhook
+        function updateWebhookStatus(isOnline) {
+            const indicator = document.getElementById('webhookStatus');
+            const text = document.getElementById('webhookStatusText');
+            const timeEl = document.getElementById('lastWebhookTime');
+            
+            if (isOnline) {
+                indicator.className = 'status-indicator status-online';
+                text.textContent = 'Online';
+                if (lastWebhookTime) {
+                    timeEl.textContent = \`Último webhook: \${lastWebhookTime.toLocaleString('pt-BR')}\`;
+                }
+            } else {
+                indicator.className = 'status-indicator status-offline';
+                text.textContent = 'Offline';
+                timeEl.textContent = 'Nenhum webhook recebido';
+            }
+        }
+
+        // Atualizar status de conectividade
+        function updateConnectionStatus(isConnected) {
+            const indicator = document.getElementById('connectionStatus');
+            const text = document.getElementById('connectionStatusText');
+            
+            if (isConnected) {
+                indicator.className = 'status-indicator status-online';
+                text.textContent = 'Conectado';
+            } else {
+                indicator.className = 'status-indicator status-offline';
+                text.textContent = 'Desconectado';
+            }
+        }
+
+        // Atualizar hora da última verificação
         function updateLastCheckTime() {
-            document.getElementById('lastCheck').textContent = new Date().toLocaleString('pt-BR');
+            document.getElementById('lastCheckTime').textContent = 
+                \`Última verificação: \${new Date().toLocaleTimeString('pt-BR')}\`;
         }
 
         // Mostrar/esconder loading
         function showLoading(show) {
-            const loading = document.getElementById('loadingIndicator');
-            loading.style.display = show ? 'block' : 'none';
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
         }
 
-        // Adicionar entrada de log
+        // Adicionar entrada de log local
         function addLogEntry(type, message) {
             const container = document.getElementById('webhookLogs');
             const logEntry = document.createElement('div');
             logEntry.className = \`log-entry log-\${type}\`;
             logEntry.innerHTML = \`
-                <strong>\${new Date().toLocaleString('pt-BR')}</strong><br>
-                \${message}
+                <strong>Sistema</strong><br>
+                \${message}<br>
+                <small>\${new Date().toLocaleString('pt-BR')}</small>
             \`;
-            container.appendChild(logEntry);
-            container.scrollTop = container.scrollHeight;
+            container.insertBefore(logEntry, container.firstChild);
         }
 
         // Limpar logs
         function clearLogs() {
-            const container = document.getElementById('webhookLogs');
-            container.innerHTML = '<div class="log-entry log-info">Logs limpos pelo usuário</div>';
+            if (confirm('Tem certeza que deseja limpar todos os logs?')) {
+                document.getElementById('webhookLogs').innerHTML = 
+                    '<div class="log-entry log-info">Logs limpos pelo usuário</div>';
+            }
         }
 
         // Testar webhook
         async function testWebhook() {
-            addLogEntry('info', 'Enviando webhook de teste...');
-            
             try {
-                const response = await fetch('/webhook', {
+                addLogEntry('info', 'Enviando webhook de teste...');
+                
+                const response = await fetch('/test-webhook', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Livetip-Webhook-Secret-Token': '0ac7b9aa00e75e0215243f3bb177c844'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         event: 'payment_confirmed',
                         payment: {
@@ -989,8 +993,7 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
         });
     </script>
 </body>
-</html>
-        `);
+</html>`);
         return;
     }
     

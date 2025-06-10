@@ -595,9 +595,7 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                         amount: amount.toString()
                     });
 
-                    console.log('📡 Chamando LiveTip API com dados:', postData);
-
-                    const liveTipData = await new Promise((resolve, reject) => {
+                    console.log('📡 Chamando LiveTip API com dados:', postData);                    const liveTipData = await new Promise((resolve, reject) => {
                         const options = {
                             hostname: 'api.livetip.gg',
                             port: 443,
@@ -606,12 +604,18 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Content-Length': Buffer.byteLength(postData),
-                                'User-Agent': 'LiveTip-Webhook-Integration/1.0'
-                            }
+                                'User-Agent': 'LiveTip-Webhook-Integration/1.0',
+                                'Accept': 'application/json'
+                            },
+                            timeout: 30000 // 30 segundos timeout
                         };
+
+                        console.log('🔧 Request options:', JSON.stringify(options, null, 2));
 
                         const req = https.request(options, (res) => {
                             let data = '';
+                            
+                            console.log(`📡 Response headers:`, res.headers);
                             
                             res.on('data', (chunk) => {
                                 data += chunk;
@@ -619,28 +623,38 @@ Header: X-Livetip-Webhook-Secret-Token</code></pre>
                             
                             res.on('end', () => {
                                 console.log(`📡 LiveTip API Response Status: ${res.statusCode}`);
+                                console.log(`📦 Raw response data:`, data);
                                 
                                 if (res.statusCode === 200 || res.statusCode === 201) {
                                     try {
                                         const parsedData = JSON.parse(data);
-                                        console.log('📦 Resposta LiveTip completa:', JSON.stringify(parsedData, null, 2));
+                                        console.log('✅ Parsed response:', JSON.stringify(parsedData, null, 2));
                                         resolve(parsedData);
                                     } catch (parseError) {
-                                        console.error('❌ Erro ao fazer parse da resposta:', parseError.message);
-                                        reject(new Error('Resposta inválida da LiveTip API'));
+                                        console.error('❌ JSON Parse Error:', parseError.message);
+                                        console.error('❌ Raw data was:', data);
+                                        reject(new Error(`JSON Parse Error: ${parseError.message}`));
                                     }
                                 } else {
-                                    console.error(`❌ LiveTip API erro: ${res.statusCode} - ${data}`);
-                                    reject(new Error(`LiveTip API erro: ${res.statusCode} - ${data}`));
+                                    console.error(`❌ HTTP Error ${res.statusCode}:`, data);
+                                    reject(new Error(`HTTP ${res.statusCode}: ${data}`));
                                 }
                             });
                         });
 
+                        req.on('timeout', () => {
+                            console.error('❌ Request timeout após 30 segundos');
+                            req.destroy();
+                            reject(new Error('Request timeout'));
+                        });
+
                         req.on('error', (error) => {
-                            console.error('❌ Erro na requisição para LiveTip:', error.message);
+                            console.error('❌ HTTPS Request Error:', error.message);
+                            console.error('❌ Error stack:', error.stack);
                             reject(error);
                         });
 
+                        console.log('📤 Enviando dados para LiveTip:', postData);
                         req.write(postData);
                         req.end();
                     });

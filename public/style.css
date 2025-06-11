@@ -556,35 +556,213 @@ header p {
     margin-bottom: 0;
 }
 
+/* Estilos para status de pagamento e animações */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { 
+        opacity: 1; 
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 0.7; 
+        transform: scale(1.05);
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* Status de pagamento */
+.status-pending {
+    color: #ffc107 !important;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+}
+
+.status-confirmed {
+    color: #28a745 !important;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(40, 167, 69, 0.3);
+    animation: slideDown 0.5s ease-out;
+}
+
+.status-failed {
+    color: #dc3545 !important;
+    font-weight: bold;
+    animation: shake 0.5s ease-out;
+}
+
+.status-expired {
+    color: #6c757d !important;
+    font-weight: bold;
+    opacity: 0.8;
+}
+
+.status-unknown {
+    color: #fd7e14 !important;
+    font-weight: bold;
+}
+
+/* Banner de confirmação */
+.confirmation-banner {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    animation: slideDown 0.5s ease-out;
+}
+
+.confirmation-banner h3 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.confirmation-banner p {
+    margin: 10px 0 0 0;
+    opacity: 0.9;
+}
+
+.confirmation-banner .transaction-id {
+    margin: 5px 0 0 0;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Banner de erro */
+.error-banner {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    animation: slideDown 0.5s ease-out;
+}
+
+.error-banner h3 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.error-banner p {
+    margin: 10px 0 0 0;
+    opacity: 0.9;
+}
+
+/* Seção QR Code melhorada */
+#qrCodeSection {
+    transition: all 0.3s ease;
+}
+
+#qrCodeSection.payment-confirmed {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border: 2px solid #28a745;
+    transform: scale(1.02);
+}
+
+#qrCodeSection.payment-failed {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    border: 2px solid #dc3545;
+}
+
+/* Indicador de polling ativo */
+.polling-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #28a745;
+    border-radius: 50%;
+    margin-left: 8px;
+    animation: pulse 1.5s infinite;
+}
+
+.polling-indicator.inactive {
+    background: #6c757d;
+    animation: none;
+}
+
+/* Melhorias no botão de verificar status */
+.btn-status-check {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-status-check:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+}
+
+.btn-status-check:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-status-check.checking {
+    animation: pulse 1s infinite;
+}
+
+/* Histórico com status colorido */
+.payment-history-item.confirmed {
+    border-left: 4px solid #28a745;
+    background: rgba(40, 167, 69, 0.05);
+}
+
+.payment-history-item.pending {
+    border-left: 4px solid #ffc107;
+    background: rgba(255, 193, 7, 0.05);
+}
+
+.payment-history-item.failed {
+    border-left: 4px solid #dc3545;
+    background: rgba(220, 53, 69, 0.05);
+}
+
+.payment-history-item.expired {
+    border-left: 4px solid #6c757d;
+    background: rgba(108, 117, 125, 0.05);
+    opacity: 0.8;
+}
+
+/* Responsividade para os novos elementos */
 @media (max-width: 768px) {
-    .container {
-        padding: 10px;
+    .confirmation-banner,
+    .error-banner {
+        padding: 15px;
+        margin: 15px 0;
     }
     
-    header h1 {
-        font-size: 2rem;
+    .confirmation-banner h3,
+    .error-banner h3 {
+        font-size: 1.2rem;
     }
     
-    .card {
-        padding: 1.5rem;
-    }
-    
-    .payment-methods {
-        flex-direction: column;
-    }
-    
-    .actions {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .btn-secondary,
-    .btn-outline {
-        margin: 5px 0;
-        width: 100%;
-    }
-    
-    .satoshi-buttons {
-        grid-template-columns: 1fr;
+    .confirmation-banner .transaction-id {
+        font-size: 0.8rem;
     }
 }

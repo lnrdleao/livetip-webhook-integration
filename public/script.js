@@ -262,67 +262,118 @@ function loadPaymentHistory() {
     `;
 }
 
-// Verificar status de pagamento específico
+// Sistema de verificação automática de status de pagamento
+function startPaymentStatusPolling(paymentId) {
+    console.log('🔄 Iniciando verificação automática de status para:', paymentId);
+    
+    // Limpar polling anterior se existir
+    if (paymentPollingInterval) {
+        clearInterval(paymentPollingInterval);
+    }
+    
+    // Atualizar status inicial
+    updatePaymentStatus('pending');
+    
+    // Verificar status a cada 5 segundos
+    paymentPollingInterval = setInterval(async () => {
+        try {
+            await checkPaymentStatus(paymentId);
+        } catch (error) {
+            console.error('Erro na verificação de status:', error);
+        }
+    }, 5000);
+    
+    // Parar verificação após 30 minutos (timeout)
+    setTimeout(() => {
+        if (paymentPollingInterval) {
+            clearInterval(paymentPollingInterval);
+            paymentPollingInterval = null;
+            console.log('⏰ Timeout: Verificação de status encerrada');
+            
+            // Se ainda estiver pendente, marcar como expirado
+            if (currentPaymentStatus === 'pending') {
+                updatePaymentStatus('expired');
+            }
+        }
+    }, 30 * 60 * 1000); // 30 minutos
+}
+
+// Verificar status do pagamento via API
 async function checkPaymentStatus(paymentId) {
     try {
-        const response = await fetch(`/payment-status/${paymentId}`);
-        const result = await response.json();
-          if (result.success) {
-            // Atualizar status no histórico local
-            let history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
-            const paymentIndex = history.findIndex(p => p.id === paymentId);
-            
-            if (paymentIndex >= 0) {
-                history[paymentIndex].status = result.status;
-                localStorage.setItem('paymentHistory', JSON.stringify(history));
-                loadPaymentHistory(); // Recarregar a lista
+        const response = await fetch(`/payment-status/${paymentId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
             }
-            
-            alert(`Status do pagamento: ${result.status === 'confirmed' ? 'Confirmado ✅' : 'Pendente ⏳'}`);
-        } else {
-            alert('Erro ao verificar status: ' + result.error);
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            const newStatus = result.data.status;
+            
+            // Só atualizar se o status mudou
+            if (newStatus !== currentPaymentStatus) {
+                console.log(`📱 Status alterado: ${currentPaymentStatus} → ${newStatus}`);
+                updatePaymentStatus(newStatus, result.data);
+                
+                // Se pagamento foi confirmado ou falhou, parar polling
+                if (newStatus === 'confirmed' || newStatus === 'failed' || newStatus === 'expired') {
+                    clearInterval(paymentPollingInterval);
+                    paymentPollingInterval = null;
+                }
+            }
+        }
+        
     } catch (error) {
-        alert('Erro na verificação: ' + error.message);
+        console.error('Erro ao verificar status:', error);
     }
 }
 
-// Exportar dados de pagamentos
-function exportPayments() {
-    const history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
+// Atualizar UI com novo status do pagamento
+function updatePaymentStatus(status, paymentData = null) {
+    currentPaymentStatus = status;
+    const statusElement = document.getElementById('paymentStatus');
     
-    if (history.length === 0) {
-        alert('Nenhum pagamento para exportar.');
-        return;
+    if (!statusElement) return;
+    
+    // Remover classes anteriores
+    statusElement.className = '';
+    
+    switch (status) {
+        case 'pending':
+            statusElement.textContent = '⏳ Aguardando pagamento...';
+            statusElement.className = 'status-pending';
+            break;
+            
+        case 'confirmed':
+            statusElement.textContent = '✅ Pagamento confirmado!';
+            statusElement.className = 'status-confirmed';
+            showPaymentConfirmation(paymentData);
+            break;
+            
+        case 'failed':
+            statusElement.textContent = '❌ Pagamento falhou';
+            statusElement.className = 'status-failed';
+            showPaymentError(paymentData);
+            break;
+            
+        case 'expired':
+            statusElement.textContent = '⏰ Pagamento expirado';
+            statusElement.className = 'status-expired';
+            break;
+            
+        default:
+            statusElement.textContent = '❓ Status desconhecido';
+            statusElement.className = 'status-unknown';
     }
     
-    const csvContent = [
-        'Data/Hora,Nome,ID Único,Método,Valor,Status,Payment ID',
-        ...history.map(p => {
-            const valorFormatado = p.paymentMethod === 'bitcoin' ? `${p.amount} sats` : `R$ ${p.amount}`;
-            const metodo = p.paymentMethod === 'bitcoin' ? 'Bitcoin' : 'PIX';
-            return `"${new Date(p.timestamp).toLocaleString('pt-BR')}","${p.userName}","${p.uniqueId}","${metodo}","${valorFormatado}","${p.status}","${p.id}"`;
-        })
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `payments_history_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-// Limpar histórico
-function clearHistory() {
-    if (confirm('⚠️ Tem certeza que deseja limpar todo o histórico de pagamentos? Esta ação não pode ser desfeita.')) {
-        localStorage.removeItem('paymentHistory');
-        loadPaymentHistory();
-        alert('✅ Histórico limpo com sucesso!');
-    }
+    console.log(`📊 Status atualizado: ${status}`);
 }
 
 // Exibir resultado do pagamento
@@ -343,6 +394,9 @@ function displayPaymentResult(paymentData) {
         qrCodeImage.src = paymentData.qrCodeImage;
         qrCodeImage.style.display = 'block';
     }
+    
+    // Iniciar verificação automática de status
+    startPaymentStatusPolling(paymentData.paymentId);
     
     const detailsDiv = document.getElementById('paymentDetails');
     
@@ -444,7 +498,7 @@ function startStatusPolling() {
 }
 
 // Mostrar confirmação de pagamento
-function showPaymentConfirmation() {
+function showPaymentConfirmation(paymentData) {
     const confirmationDiv = document.createElement('div');
     confirmationDiv.className = 'payment-confirmation';
     confirmationDiv.innerHTML = `
@@ -462,6 +516,56 @@ function showPaymentConfirmation() {
             confirmationDiv.remove();
         }
     }, 10000);
+}
+
+// Exibir erro de pagamento
+function showPaymentError(paymentData) {
+    const qrCodeSection = document.getElementById('qrCodeSection');
+    qrCodeSection.style.background = 'linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%)';
+    qrCodeSection.style.border = '2px solid #dc3545';
+    
+    const errorBanner = document.createElement('div');
+    errorBanner.innerHTML = `
+        <div style="
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        ">
+            <div style="font-size: 2.5rem; margin-bottom: 10px;">⚠️</div>
+            <h3 style="margin: 0; font-size: 1.5rem;">Pagamento Falhou</h3>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">
+                ${paymentData?.errorMessage || 'Erro na confirmação do pagamento'}
+            </p>
+        </div>
+    `;
+    
+    const paymentDetails = document.getElementById('paymentDetails');
+    paymentDetails.parentNode.insertBefore(errorBanner, paymentDetails);
+    
+    updateLocalHistoryStatus(currentPaymentId, 'failed');
+}
+
+// Atualizar status no histórico local
+function updateLocalHistoryStatus(paymentId, newStatus) {
+    try {
+        const history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
+        const paymentIndex = history.findIndex(p => p.id === paymentId);
+        
+        if (paymentIndex !== -1) {
+            history[paymentIndex].status = newStatus;
+            history[paymentIndex].confirmedAt = new Date().toISOString();
+            localStorage.setItem('paymentHistory', JSON.stringify(history));
+            
+            // Recarregar histórico na tela
+            loadPaymentHistory();
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar histórico:', error);
+    }
 }
 
 // Utilitários
@@ -547,3 +651,49 @@ document.addEventListener('DOMContentLoaded', function() {
     // Carregar histórico automaticamente
     loadPaymentHistory();
 });
+
+// CSS adicional para animações e status
+const additionalStyles = `
+<style>
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.status-pending {
+    color: #ffc107;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+}
+
+.status-confirmed {
+    color: #28a745;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(40, 167, 69, 0.3);
+}
+
+.status-failed {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.status-expired {
+    color: #6c757d;
+    font-weight: bold;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+</style>
+`;
+
+// Injetar CSS adicional
+document.head.insertAdjacentHTML('beforeend', additionalStyles);

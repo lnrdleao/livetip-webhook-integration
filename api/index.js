@@ -446,11 +446,88 @@ module.exports = async (req, res) => {
             }
         });
     }
-    
-    if (url === '/webhook' && method === 'POST') {
+      if (url === '/webhook' && method === 'POST') {
         const token = req.headers['x-livetip-webhook-secret-token'];
         if (token !== '0ac7b9aa00e75e0215243f3bb177c844') {
             return res.status(401).json({ error: 'Invalid webhook token' });
+        }
+
+        console.log('🔔 Webhook recebido:', JSON.stringify(req.body, null, 2));
+
+        // Processar webhook de confirmação de pagamento
+        const { event, payment } = req.body;
+        
+        if (event === 'payment_confirmed' && payment) {
+            const { sender, content, amount, currency, paid, paymentId: liveTipPaymentId } = payment;
+            
+            console.log(`💰 Processando confirmação de pagamento:
+                🆔 LiveTip ID: ${liveTipPaymentId}
+                👤 Sender: ${sender}
+                💵 Amount: ${amount} ${currency}
+                ✅ Paid: ${paid}
+                📝 Content: ${content}`);
+            
+            // Encontrar pagamento local correspondente
+            let foundPayment = null;
+            let matchMethod = '';
+            
+            // Método 1: Match por uniqueId no content (para Bitcoin)
+            if (content) {
+                for (let [localId, storedPayment] of payments.entries()) {
+                    if (storedPayment.uniqueId && content.includes(storedPayment.uniqueId)) {
+                        foundPayment = storedPayment;
+                        foundPayment.localId = localId;
+                        matchMethod = 'uniqueId';
+                        break;
+                    }
+                }
+            }
+            
+            // Método 2: Match por liveTipPaymentId
+            if (!foundPayment) {
+                for (let [localId, storedPayment] of payments.entries()) {
+                    if (storedPayment.liveTipPaymentId === liveTipPaymentId) {
+                        foundPayment = storedPayment;
+                        foundPayment.localId = localId;
+                        matchMethod = 'liveTipPaymentId';
+                        break;
+                    }
+                }
+            }
+            
+            // Método 3: Match por userName (sender)
+            if (!foundPayment && sender) {
+                for (let [localId, storedPayment] of payments.entries()) {
+                    if (storedPayment.userName === sender && storedPayment.status === 'pending') {
+                        foundPayment = storedPayment;
+                        foundPayment.localId = localId;
+                        matchMethod = 'userName';
+                        break;
+                    }
+                }
+            }
+            
+            if (foundPayment) {
+                // Atualizar status do pagamento
+                const oldStatus = foundPayment.status;
+                foundPayment.status = paid ? 'confirmed' : 'pending';
+                foundPayment.liveTipPaymentId = liveTipPaymentId;
+                foundPayment.webhookReceived = true;
+                foundPayment.updatedAt = new Date().toISOString();
+                foundPayment.liveTipData = payment;
+                
+                // Atualizar no Map
+                payments.set(foundPayment.localId, foundPayment);
+                
+                console.log(`✅ Pagamento atualizado:
+                    🆔 Local ID: ${foundPayment.localId}
+                    🔍 Match: ${matchMethod}
+                    📊 Status: ${oldStatus} → ${foundPayment.status}
+                    👤 User: ${foundPayment.userName}
+                    💰 Amount: ${foundPayment.amount}`);
+            } else {
+                console.log('⚠️ Pagamento não encontrado nos registros locais');
+            }
         }
 
         // Log webhook
@@ -458,10 +535,11 @@ module.exports = async (req, res) => {
             id: generateUuid(),
             timestamp: new Date().toISOString(),
             type: 'webhook',
-            event: 'payment_notification',
-            status: 'received',
+            event: event || 'payment_notification',
+            status: 'processed',
             data: JSON.stringify(req.body),
-            ip: req.headers['x-forwarded-for'] || 'unknown'
+            ip: req.headers['x-forwarded-for'] || 'unknown',
+            processedPayment: foundPayment ? foundPayment.localId : null
         };
         
         webhookLogs.push(logEntry);
@@ -471,7 +549,9 @@ module.exports = async (req, res) => {
 
         return res.status(200).json({ 
             success: true, 
+            message: foundPayment ? '🎉 Pagamento confirmado com sucesso!' : '📝 Webhook processado',
             received: req.body,
+            processed: !!foundPayment,
             timestamp: new Date().toISOString(),
             logId: logEntry.id
         });
@@ -749,9 +829,7 @@ module.exports = async (req, res) => {
                     source: paymentData.source,
                     createdAt: paymentData.createdAt
                 }
-            });
-
-        } catch (error) {
+            });        } catch (error) {
             console.error('❌ Error generating QR Code:', error.message);
             return res.status(500).json({ 
                 success: false,
@@ -759,9 +837,48 @@ module.exports = async (req, res) => {
                 details: error.message
             });
         }
-    }    
+    }
+
+    // Payment status endpoint for automated confirmation system
+    if (url.startsWith('/payment-status/') && method === 'GET') {
+        const paymentId = url.split('/payment-status/')[1];
+        
+        if (!paymentId) {
+            return res.status(400).json({
+                success: false,
+                error: 'ID do pagamento é obrigatório'
+            });
+        }
+
+        console.log(`🔍 Verificando status do pagamento: ${paymentId}`);
+
+        // Buscar pagamento no Map de pagamentos
+        const payment = payments.get(paymentId);
+        
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                error: 'Pagamento não encontrado'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                paymentId: paymentId,
+                status: payment.status || 'pending',
+                userName: payment.userName,
+                amount: payment.amount,
+                method: payment.method,
+                createdAt: payment.createdAt,
+                updatedAt: payment.updatedAt || payment.createdAt,
+                liveTipPaymentId: payment.liveTipPaymentId,
+                webhookReceived: payment.webhookReceived || false            }
+        });
+    }
+    
     // 404 for unknown routes
-    res.status(404).json({ 
+    res.status(404).json({
         error: 'Route not found',
         availableRoutes: [
             'GET /',
@@ -770,7 +887,11 @@ module.exports = async (req, res) => {
             'GET /webhook',
             'POST /webhook',
             'GET /health',
-            'POST /generate-qr'
+            'POST /generate-qr',
+            'GET /payment-status/{paymentId}',
+            'GET /payments',
+            'GET /webhook-logs',
+            'GET /webhook-stats'
         ]
     });
 };

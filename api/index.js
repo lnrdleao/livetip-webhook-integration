@@ -415,8 +415,11 @@ module.exports = async (req, res) => {
         .card { background: white; border-radius: 15px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-bottom: 1rem; }
         .btn { background: #6c757d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin-top: 20px; transition: all 0.3s; }
         .btn:hover { transform: translateY(-2px); }
-        .endpoint { background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; margin: 10px 0; border-left: 4px solid #007bff; }
-        .log-entry { background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #28a745; }
+        .endpoint { background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; margin: 10px 0; border-left: 4px solid #007bff; word-break: break-all; }
+        .log-entry { background: #f8f9fa; padding: 10px; margin: 8px 0; border-radius: 8px; border-left: 4px solid #28a745; font-size: 0.9em; }
+        .log-entry strong { display: block; margin-bottom: 5px; color: #007bff; }
+        .log-entry pre { white-space: pre-wrap; word-break: break-all; background: #e9ecef; padding: 10px; border-radius: 5px; max-height: 200px; overflow-y: auto; }
+        #loading-logs { text-align: center; padding: 20px; color: white; }
     </style>
 </head>
 <body>
@@ -453,10 +456,11 @@ module.exports = async (req, res) => {
 
         <div class="card">
             <h3>📊 Logs Recentes</h3>
-            <div id="webhook-logs">
+            <div id="webhook-logs-container">
                 <div class="log-entry">
                     <strong>Sistema iniciado:</strong> ${new Date().toLocaleString('pt-BR')}
                 </div>
+                <div id="loading-logs">Carregando logs...</div>
             </div>
         </div>
         
@@ -464,10 +468,75 @@ module.exports = async (req, res) => {
     </div>
 
     <script>
-        // Auto-refresh da página a cada 30 segundos
+        async function fetchWebhookLogs() {
+            const logsContainer = document.getElementById('webhook-logs-container');
+            const loadingIndicator = document.getElementById('loading-logs');
+            try {
+                const response = await fetch('/webhook-logs-data');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const logs = await response.json();
+                
+                if (loadingIndicator) loadingIndicator.style.display = 'none';
+
+                if (logs.length === 0) {
+                    const noLogsEntry = document.createElement('div');
+                    noLogsEntry.className = 'log-entry';
+                    noLogsEntry.textContent = 'Nenhum webhook recebido ainda.';
+                    logsContainer.appendChild(noLogsEntry);
+                    return;
+                }
+
+                // Clear previous logs except the "Sistema iniciado" and "loading"
+                while (logsContainer.children.length > 2) {
+                    if (logsContainer.lastChild.id !== 'loading-logs') {
+                         logsContainer.removeChild(logsContainer.lastChild);
+                    } else {
+                        break; 
+                    }
+                }
+                if(logsContainer.children.length > 1 && logsContainer.lastChild.id === 'loading-logs' && logs.length > 0){
+                    // Remove loading indicator if logs are successfully loaded
+                     logsContainer.removeChild(logsContainer.lastChild);
+                }
+
+
+                logs.forEach(log => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.className = 'log-entry';
+                    
+                    const timestampStrong = document.createElement('strong');
+                    timestampStrong.textContent = \`Recebido em: ${new Date(log.timestamp).toLocaleString('pt-BR')} (IP: ${log.sourceIp || 'N/A'})\`;
+                    entryDiv.appendChild(timestampStrong);
+                    
+                    const dataPre = document.createElement('pre');
+                    dataPre.textContent = JSON.stringify(log.data, null, 2);
+                    entryDiv.appendChild(dataPre);
+                    
+                    logsContainer.appendChild(entryDiv);
+                });
+
+            } catch (error) {
+                console.error('Erro ao buscar logs de webhook:', error);
+                if (loadingIndicator) loadingIndicator.textContent = 'Erro ao carregar logs.';
+                const errorEntry = document.createElement('div');
+                errorEntry.className = 'log-entry';
+                errorEntry.style.borderLeftColor = '#dc3545';
+                errorEntry.textContent = 'Falha ao carregar logs do webhook. Verifique o console para detalhes.';
+                logsContainer.appendChild(errorEntry);
+            }
+        }
+
+        // Fetch logs on page load
+        fetchWebhookLogs();
+
+        // Auto-refresh logs every 15 seconds
+        setInterval(fetchWebhookLogs, 15000);
+
+        // Keep console log for page activity
         setInterval(() => {
-            const now = new Date().toLocaleString('pt-BR');
-            console.log('Webhook Monitor ativo:', now);
+            console.log('Webhook Monitor page active and refreshing logs:', new Date().toLocaleString('pt-BR'));
         }, 30000);
     </script>
 </body>

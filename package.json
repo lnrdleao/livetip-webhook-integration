@@ -2,8 +2,7 @@
   "name": "livetip-webhook-integration",
   "version": "1.0.0",
   "description": "LiveTip Bitcoin Lightning Invoice Webhook Integration System - PIX/Bitcoin Payments",
-  "main": "server.js",
-  "scripts": {
+  "main": "server.js",  "scripts": {
     "start": "node server.js",
     "build": "echo 'Build completed'",
     "dev": "nodemon server.js",
@@ -11,6 +10,7 @@
     "test:webhook": "node test-webhook.js",
     "test:webhook-new": "node test-new-webhook-token.js",
     "test:qr-logos": "node test-qr-logos.js",
+    "test:qr-fallback": "node testar-qrcode-fallback.js",
     "test:logo-verification": "node test-logo-verification.js",
     "test:bitcoin-100": "node test-bitcoin-100.js",
     "test:bitcoin-200": "node test-bitcoin-200.js",
@@ -31,7 +31,8 @@
     "dotenv": "^16.5.0",
     "express": "^4.18.2",
     "node-fetch": "^2.7.0",
-    "qrcode": "^1.5.3",
+    "puppeteer": "^24.10.1",
+    "qrcode": "^1.5.4",
     "qrcode-with-logos": "^1.1.1",
     "uuid": "^9.0.0"
   },

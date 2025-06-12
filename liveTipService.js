@@ -4,6 +4,11 @@ const config = require('./config');
 
 class LiveTipService {
     constructor() {
+        // Nota: Não estamos mais usando o baseUrl dinamicamente.
+        // Em vez disso, estamos usando diretamente os endpoints corretos (hardcoded)
+        // para cada método específico (PIX, Bitcoin, auth, etc)
+        
+        // Mantemos o baseUrl apenas para compatibilidade com código legado e logs
         this.baseUrl = config.payment.apiUrl;
         this.apiToken = config.payment.apiToken;
         this.username = process.env.LIVETIP_USERNAME;
@@ -11,7 +16,8 @@ class LiveTipService {
         
         // Log das configurações (sem mostrar senha)
         console.log('🔧 LiveTip Service inicializado:');
-        console.log(`   Base URL: ${this.baseUrl}`);
+        console.log(`   Base URL (info): ${this.baseUrl}`);
+        console.log(`   ↳ Endpoint real: https://api.livetip.gg/api/v1/message/10`);
         console.log(`   Username: ${this.username ? '✅ Configurado' : '❌ Não configurado'}`);
         console.log(`   Password: ${this.password ? '✅ Configurado' : '❌ Não configurado'}`);
         console.log(`   API Token: ${this.apiToken ? '✅ Configurado' : '❌ Não configurado'}`);
@@ -26,11 +32,9 @@ class LiveTipService {
 
         if (!this.username || !this.password) {
             throw new Error('Credenciais não configuradas. Execute setup-api-credentials.ps1');
-        }
-
-        try {
+        }        try {
             console.log('🔐 Fazendo login na API LiveTip...');
-            const response = await fetch(`${this.baseUrl}/auth/login`, {
+            const response = await fetch(`https://api.livetip.gg/api/v1/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -76,24 +80,40 @@ class LiveTipService {
                 },
                 body: JSON.stringify(payload)
             });
-            
-            if (!response.ok) {
+              if (!response.ok) {
                 throw new Error(`Erro na API LiveTip: ${response.status} - ${response.statusText}`);
             }
 
-            // A API retorna o código PIX diretamente como texto
-            const pixCodeFromApi = await response.text();
+            // A API pode retornar texto ou JSON, vamos tentar processar ambos
+            const responseText = await response.text();
+            console.log('✅ Resposta da API LiveTip:', responseText);
             
-            console.log('✅ Código PIX recebido da API LiveTip:', pixCodeFromApi);
-
+            // Tenta verificar se a resposta é um JSON válido
+            let pixCodeFromApi;
+            try {
+                const jsonResponse = JSON.parse(responseText);
+                // Se for JSON e tiver campo 'code', usamos esse campo
+                if (jsonResponse && jsonResponse.code) {
+                    pixCodeFromApi = jsonResponse.code;
+                    console.log('✅ Código PIX extraído do JSON:', pixCodeFromApi);
+                } else {
+                    // JSON sem campo code - usar a string completa
+                    pixCodeFromApi = responseText;
+                }
+            } catch (e) {
+                // Não é JSON - usar a string completa como código PIX
+                pixCodeFromApi = responseText;
+                console.log('✅ Código PIX em formato texto puro');
+            }
+            
             if (!pixCodeFromApi || pixCodeFromApi.length < 50) {
                 throw new Error('Código PIX inválido recebido da API');
-            }            // Importar QR Code Generator aqui para garantir que ele esteja disponível
-            const QRCodeWithLogo = require('./qrCodeGenerator');
-            const qrCodeGenerator = new QRCodeWithLogo();
+            }
+            // Importar QR Code Generator de forma mais robusta
+            const qrCodeGenerator = require('./qrCodeGenerator');
             
             try {
-                // Gerar QR code do PIX diretamente aqui para evitar problemas no server.js
+                // Gerar QR code do PIX diretamente usando a instância ou método exportado
                 const qrCodeDataUrl = await qrCodeGenerator.generateWithLogo(pixCodeFromApi, 'pix');
                 
                 // Retornar dados do pagamento com o código PIX e QR code da API LiveTip
@@ -183,12 +203,10 @@ class LiveTipService {
             console.error('❌ Erro ao criar pagamento Bitcoin:', error);
             throw error;
         }
-    }
-
-    // Verificar status de pagamento
+    }    // Verificar status de pagamento
     async getPaymentStatus(paymentId) {
         try {
-            const response = await fetch(`${this.baseUrl}/payments/${paymentId}`, {
+            const response = await fetch(`https://api.livetip.gg/api/v1/payments/${paymentId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${this.apiToken}`,
@@ -208,12 +226,10 @@ class LiveTipService {
             console.error('❌ Erro ao verificar status do pagamento:', error);
             throw error;
         }
-    }
-
-    // Cancelar pagamento
+    }    // Cancelar pagamento
     async cancelPayment(paymentId) {
         try {
-            const response = await fetch(`${this.baseUrl}/payments/${paymentId}/cancel`, {
+            const response = await fetch(`https://api.livetip.gg/api/v1/payments/${paymentId}/cancel`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.apiToken}`,

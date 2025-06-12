@@ -12,7 +12,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "qrCodeGeneratorFallback.js"
+      "includeFiles": ["qrCodeGeneratorFallback.js", "pix-fix-based-on-bitcoin.js"]
     }
   }
 }

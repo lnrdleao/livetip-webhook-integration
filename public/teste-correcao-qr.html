@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Correção PIX/Bitcoin - LiveTip</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+        
+        .test-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            background-color: #4a6fa5;
+            color: white;
+        }
+        
+        .pix-button {
+            background-color: #32bcad;
+        }
+        
+        .bitcoin-button {
+            background-color: #f7931a;
+        }
+        
+        .log-area {
+            background-color: #1e1e1e;
+            color: #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        
+        .result-area {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+        }
+        
+        .qr-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .success {
+            color: #4caf50;
+        }
+        
+        .error {
+            color: #f44336;
+        }
+        
+        pre {
+            overflow-x: auto;
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste de Correção PIX/Bitcoin QR Code</h1>
+    
+    <div class="test-buttons">
+        <button class="pix-button" onclick="testQRCode('pix', 1)">Testar PIX R$ 1</button>
+        <button class="pix-button" onclick="testQRCode('pix', 2)">Testar PIX R$ 2</button>
+        <button class="pix-button" onclick="testQRCode('pix', 3)">Testar PIX R$ 3</button>
+        <button class="pix-button" onclick="testQRCode('pix', 4)">Testar PIX R$ 4</button>
+        <button class="bitcoin-button" onclick="testQRCode('bitcoin', 100)">Testar Bitcoin 100 sats</button>
+        <button class="bitcoin-button" onclick="testQRCode('bitcoin', 200)">Testar Bitcoin 200 sats</button>
+        <button class="bitcoin-button" onclick="testQRCode('bitcoin', 300)">Testar Bitcoin 300 sats</button>
+    </div>
+    
+    <div class="log-area" id="log"></div>
+    
+    <div class="result-area" id="result">
+        <h2>Resultado do Teste</h2>
+        <p id="status">Clique em um dos botões acima para iniciar o teste.</p>
+        <div class="qr-container" id="qr-container"></div>
+        <pre id="jsonResult"></pre>
+    </div>
+    
+    <script>
+        const logElement = document.getElementById('log');
+        const resultElement = document.getElementById('result');
+        const statusElement = document.getElementById('status');
+        const qrContainerElement = document.getElementById('qr-container');
+        const jsonResultElement = document.getElementById('jsonResult');
+        
+        // Função para adicionar logs
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = document.createElement('div');
+            
+            switch (type) {
+                case 'success':
+                    logLine.innerHTML = `<span style="color: #4caf50">[${timestamp}] ✅ ${message}</span>`;
+                    break;
+                case 'error':
+                    logLine.innerHTML = `<span style="color: #f44336">[${timestamp}] ❌ ${message}</span>`;
+                    break;
+                case 'warning':
+                    logLine.innerHTML = `<span style="color: #ff9800">[${timestamp}] ⚠️ ${message}</span>`;
+                    break;
+                default:
+                    logLine.innerHTML = `<span style="color: #2196f3">[${timestamp}] 🔍 ${message}</span>`;
+            }
+            
+            logElement.appendChild(logLine);
+            logElement.scrollTop = logElement.scrollHeight; // Auto-scroll para o último log
+        }
+        
+        // Função principal para testar geração de QR code
+        async function testQRCode(method, amount) {
+            // Limpar resultados anteriores
+            qrContainerElement.innerHTML = '';
+            jsonResultElement.textContent = '';
+            
+            try {
+                // Atualizar status
+                statusElement.innerHTML = `<span class="info">🔄 Testando ${method === 'pix' ? 'PIX R$' + amount : 'Bitcoin ' + amount + ' satoshis'}...</span>`;
+                
+                // Construir dados do teste
+                log(`Iniciando teste de ${method === 'pix' ? 'PIX R$' + amount : 'Bitcoin ' + amount + ' satoshis'}...`);
+                
+                const testData = {
+                    userName: `Teste ${method === 'pix' ? 'PIX' : 'Bitcoin'} ${Date.now()}`,
+                    paymentMethod: method,
+                    amount: amount
+                };
+                
+                // Adicionar uniqueId para Bitcoin
+                if (method === 'bitcoin') {
+                    testData.uniqueId = `TEST_${method.toUpperCase()}_${Date.now()}`;
+                }
+                
+                log(`Enviando requisição: ${JSON.stringify(testData)}`, 'info');
+                
+                // Fazer requisição para a API
+                const response = await fetch('/generate-qr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const result = await response.json();
+                
+                // Atualizar logs baseado no resultado
+                if (result.success) {
+                    log(`Resposta recebida com sucesso - Status: ${response.status}`, 'success');
+                    
+                    // FUNÇÃO CRÍTICA - Aplicar correção para garantir QR code
+                    ensureQRCodeData(result.data, method);
+                    
+                    // Exibir resultado detalhado
+                    log(`QR Code URL: ${result.data.qrCodeImage ? result.data.qrCodeImage.substring(0, 50) + '...' : 'Não disponível'}`, 
+                        result.data.qrCodeImage ? 'success' : 'error');
+                        
+                    if (method === 'pix') {
+                        log(`PIX Code: ${result.data.pixCode ? 'Disponível' : 'Não disponível'}`,
+                            result.data.pixCode ? 'success' : 'error');
+                    } else {
+                        log(`Lightning/Bitcoin Code: ${result.data.lightningInvoice || result.data.bitcoinUri ? 'Disponível' : 'Não disponível'}`,
+                            result.data.lightningInvoice || result.data.bitcoinUri ? 'success' : 'error');
+                    }
+                    
+                    // Exibir QR code
+                    if (result.data.qrCodeImage) {
+                        const qrImage = document.createElement('img');
+                        qrImage.src = result.data.qrCodeImage;
+                        qrImage.alt = `QR Code ${method}`;
+                        qrImage.style.maxWidth = '200px';
+                        qrContainerElement.appendChild(qrImage);
+                        
+                        // Verificar formato do QR code
+                        const qrFormat = result.data.qrCodeImage.startsWith('http') ? 'URL (produção)' : 
+                                       result.data.qrCodeImage.startsWith('data:image') ? 'Base64 (local)' : 'Desconhecido';
+                        
+                        log(`Formato do QR code: ${qrFormat}`, qrFormat !== 'Desconhecido' ? 'success' : 'warning');
+                    }
+                    
+                    // Atualizar status
+                    statusElement.innerHTML = `<span class="success">✅ Teste concluído com sucesso para ${method === 'pix' ? 'PIX R$' + amount : 'Bitcoin ' + amount + ' satoshis'}</span>`;
+                    
+                } else {
+                    log(`Erro na resposta: ${result.error || 'Erro desconhecido'}`, 'error');
+                    statusElement.innerHTML = `<span class="error">❌ Teste falhou para ${method === 'pix' ? 'PIX R$' + amount : 'Bitcoin ' + amount + ' satoshis'}</span>`;
+                }
+                
+                // Exibir JSON completo da resposta
+                jsonResultElement.textContent = JSON.stringify(result, null, 2);
+                
+            } catch (error) {
+                log(`Erro durante o teste: ${error.message}`, 'error');
+                statusElement.innerHTML = `<span class="error">❌ Erro de comunicação: ${error.message}</span>`;
+            }
+        }
+        
+        // FUNÇÃO CRÍTICA: Garantir dados do QR code (implementação da correção)
+        function ensureQRCodeData(responseData, paymentMethod) {
+            log('Verificando dados do QR code...', 'info');
+            
+            // Se já temos uma URL válida de QR code, não fazemos nada
+            if (responseData.qrCodeImage && typeof responseData.qrCodeImage === 'string' && 
+                (responseData.qrCodeImage.startsWith('http') || responseData.qrCodeImage.startsWith('data:image'))) {
+                log('QR code URL já está no formato correto', 'success');
+                return;
+            }
+            
+            log('QR code URL ausente ou inválida, aplicando correção...', 'warning');
+            
+            // Determinar o texto para o QR code baseado no método de pagamento
+            let qrCodeText = '';
+            
+            if (paymentMethod === 'pix' && responseData.pixCode) {
+                qrCodeText = responseData.pixCode;
+                log('Usando código PIX para gerar QR code', 'info');
+            } else if (paymentMethod === 'bitcoin') {
+                qrCodeText = responseData.lightningInvoice || responseData.bitcoinUri || '';
+                log('Usando Bitcoin Invoice/URI para gerar QR code', 'info');
+            } else {
+                qrCodeText = `Payment ID: ${responseData.paymentId}`;
+                log('Usando ID como fallback para QR code', 'warning');
+            }
+            
+            // Gerar URL para QR code usando API externa
+            responseData.qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeText)}`;
+            log('QR code URL gerada com serviço externo', 'success');
+            
+            // Garantir que temos o texto do QR code
+            responseData.qrCodeText = qrCodeText;
+        }
+        
+        // Log inicial
+        log('Teste de correção PIX/Bitcoin QR Code inicializado', 'info');
+        log('Clique em um dos botões acima para testar a geração de QR code', 'info');
+    </script>
+</body>
+</html>

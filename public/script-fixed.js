@@ -1,5 +1,5 @@
-// Script corrigido unificando o tratamento de PIX e Bitcoin baseado no código que funciona
-// Atualizado em 12/06/2025 - Correção do problema de QR code PIX em produção (Vercel)
+// Correção para o problema de exibição do QR code no frontend
+// Este arquivo deve substituir o script.js original após testes
 
 let currentPaymentId = null;
 let currentUniqueId = null;
@@ -159,36 +159,35 @@ paymentForm.addEventListener('submit', async (e) => {
 
 // Garantir que temos os dados necessários para exibir o QR code
 function ensureQRCodeData(responseData, paymentMethod) {
-    console.log('🔄 Verificando dados do QR code para', paymentMethod);
-    
-    // Se já temos uma URL válida de QR code, não fazemos nada
+    // Se já temos URL do QR code e ela parece válida, não precisamos fazer nada
     if (responseData.qrCodeImage && typeof responseData.qrCodeImage === 'string' && 
         (responseData.qrCodeImage.startsWith('http') || responseData.qrCodeImage.startsWith('data:image'))) {
-        console.log('✅ QR code URL encontrada:', responseData.qrCodeImage.substring(0, 50) + '...');
+        console.log('QR code URL válida encontrada:', responseData.qrCodeImage.substring(0, 50) + '...');
         return;
     }
     
-    console.log('⚠️ QR code URL ausente ou inválida, gerando URL externa...');
+    console.log('QR code URL ausente ou inválida, gerando alternativa...');
     
     // Determinar o texto para o QR code baseado no método de pagamento
     let qrCodeText = '';
     
     if (paymentMethod === 'pix' && responseData.pixCode) {
         qrCodeText = responseData.pixCode;
-        console.log('📝 Usando código PIX para QR code');
+        console.log('Usando código PIX para gerar QR code alternativo');
     } else if (paymentMethod === 'bitcoin') {
         qrCodeText = responseData.lightningInvoice || responseData.bitcoinUri || '';
-        console.log('⚡ Usando Bitcoin Invoice/URI para QR code');
+        console.log('Usando Bitcoin Invoice/URI para gerar QR code alternativo');
     } else {
+        // Fallback para casos extremos - usa o ID do pagamento
         qrCodeText = `Payment ID: ${responseData.paymentId}`;
-        console.log('🆔 Usando ID como fallback para QR code');
+        console.log('Usando ID do pagamento como fallback para QR code');
     }
     
-    // Gerar URL para QR code usando API externa (mesmo formato do Bitcoin que funciona)
+    // Gerar URL para QR code usando API externa
     responseData.qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeText)}`;
-    console.log('🔄 QR code URL gerada:', responseData.qrCodeImage.substring(0, 50) + '...');
+    console.log('QR code URL gerada:', responseData.qrCodeImage.substring(0, 50) + '...');
     
-    // Garantir que temos o texto do QR code
+    // Garantir que temos o texto do QR code também
     responseData.qrCodeText = qrCodeText;
 }
 

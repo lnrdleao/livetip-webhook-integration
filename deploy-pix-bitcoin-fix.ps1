@@ -1,6 +1,7 @@
 # PowerShell script para implantar as correções PIX e Bitcoin
 # Script: deploy-pix-bitcoin-fix.ps1
 # Data: 12 de Junho de 2025
+# Última atualização: 12 de Junho de 2025 - Correção para QR code PIX em produção
 
 Write-Host "🚀 Iniciando deploy das correções PIX e Bitcoin..." -ForegroundColor Cyan
 

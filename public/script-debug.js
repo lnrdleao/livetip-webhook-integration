@@ -1,5 +1,5 @@
-// Script corrigido unificando o tratamento de PIX e Bitcoin baseado no código que funciona
-// Atualizado em 12/06/2025 - Correção do problema de QR code PIX em produção (Vercel)
+// Versão de debug do script.js para identificar problemas na exibição do QR code
+// Copia todas as funções originais, mas adiciona logs detalhados
 
 let currentPaymentId = null;
 let currentUniqueId = null;
@@ -24,6 +24,15 @@ const qrCodeSection = document.getElementById('qrCodeSection');
 const paymentFormCard = document.getElementById('paymentForm');
 const loading = document.getElementById('loading');
 
+// Função de log melhorada
+function debugLog(message, data = null) {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    console.log(`[DEBUG ${timestamp}] ${message}`);
+    if (data) {
+        console.log(data);
+    }
+}
+
 // Gerar identificador único para Bitcoin
 function generateUniqueId() {
     const timestamp = Date.now();
@@ -40,6 +49,8 @@ function generatePixUniqueId() {
 
 // Atualizar interface baseada no método de pagamento
 function updatePaymentInterface(paymentMethod) {
+    debugLog(`Atualizando interface para método: ${paymentMethod}`);
+    
     const amountLabel = document.getElementById('amountLabel');
     const amountInput = document.getElementById('amount');
     const satoshiValues = document.getElementById('satoshiValues');
@@ -86,10 +97,18 @@ function updatePaymentInterface(paymentMethod) {
 // Submissão do formulário
 paymentForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    debugLog("Formulário de pagamento enviado");
     
     const formData = new FormData(paymentForm);
     const paymentMethod = formData.get('paymentMethod');
     const amount = parseFloat(formData.get('amount'));
+    
+    debugLog("Dados do formulário:", {
+        userName: formData.get('userName'),
+        amount,
+        paymentMethod,
+        uniqueId: currentUniqueId
+    });
     
     const data = {
         userName: formData.get('userName'),
@@ -112,6 +131,7 @@ paymentForm.addEventListener('submit', async (e) => {
     
     try {
         showLoading(true);
+        debugLog("Enviando requisição para /generate-qr");
         
         const response = await fetch('/generate-qr', {
             method: 'POST',
@@ -121,19 +141,43 @@ paymentForm.addEventListener('submit', async (e) => {
             body: JSON.stringify(data)
         });
         
-        const result = await response.json();
+        debugLog("Resposta recebida, status:", response.status);
+        
+        // Obter o texto bruto da resposta para debug
+        const responseText = await response.text();
+        debugLog("Resposta bruta:", responseText.substring(0, 200) + (responseText.length > 200 ? "..." : ""));
+        
+        // Tentar analisar como JSON
+        let result;
+        try {
+            result = JSON.parse(responseText);
+            debugLog("JSON analisado com sucesso");
+        } catch (jsonError) {
+            debugLog("ERRO: Falha ao analisar JSON", jsonError);
+            alert("Erro na resposta do servidor: formato inválido");
+            showLoading(false);
+            return;
+        }
         
         if (result.success) {
+            debugLog("Resposta bem-sucedida", result.data);
+            
+            // Verificar se temos paymentId na resposta
+            if (!result.data.paymentId) {
+                debugLog("AVISO: paymentId ausente na resposta!");
+            }
+            
             currentPaymentId = result.data.paymentId;
             
-            // Modificar resposta para garantir compatibilidade com ambientes locais e produção
-            const responseData = result.data;
+            // Verificação importante: a URL do QR code está presente?
+            if (!result.data.qrCodeImage) {
+                debugLog("ERRO: qrCodeImage ausente na resposta!");
+            } else {
+                debugLog("QR code URL:", result.data.qrCodeImage.substring(0, 50) + "...");
+            }
             
-            // Garantir que temos os dados necessários para QR code
-            ensureQRCodeData(responseData, paymentMethod);
-            
-            // Exibir resultado com os dados tratados
-            displayPaymentResult(responseData);
+            // Chamar função para exibir o resultado
+            displayPaymentResult(result.data);
             
             // Salvar no histórico local para Bitcoin e PIX
             if (paymentMethod === 'bitcoin' || paymentMethod === 'pix') {
@@ -148,110 +192,36 @@ paymentForm.addEventListener('submit', async (e) => {
                 });
             }
         } else {
+            debugLog("Erro na resposta:", result.error);
             alert('Erro ao gerar QR Code: ' + result.error);
         }
     } catch (error) {
+        debugLog("ERRO na requisição:", error);
         alert('Erro na requisição: ' + error.message);
     } finally {
         showLoading(false);
     }
 });
 
-// Garantir que temos os dados necessários para exibir o QR code
-function ensureQRCodeData(responseData, paymentMethod) {
-    console.log('🔄 Verificando dados do QR code para', paymentMethod);
-    
-    // Se já temos uma URL válida de QR code, não fazemos nada
-    if (responseData.qrCodeImage && typeof responseData.qrCodeImage === 'string' && 
-        (responseData.qrCodeImage.startsWith('http') || responseData.qrCodeImage.startsWith('data:image'))) {
-        console.log('✅ QR code URL encontrada:', responseData.qrCodeImage.substring(0, 50) + '...');
-        return;
-    }
-    
-    console.log('⚠️ QR code URL ausente ou inválida, gerando URL externa...');
-    
-    // Determinar o texto para o QR code baseado no método de pagamento
-    let qrCodeText = '';
-    
-    if (paymentMethod === 'pix' && responseData.pixCode) {
-        qrCodeText = responseData.pixCode;
-        console.log('📝 Usando código PIX para QR code');
-    } else if (paymentMethod === 'bitcoin') {
-        qrCodeText = responseData.lightningInvoice || responseData.bitcoinUri || '';
-        console.log('⚡ Usando Bitcoin Invoice/URI para QR code');
-    } else {
-        qrCodeText = `Payment ID: ${responseData.paymentId}`;
-        console.log('🆔 Usando ID como fallback para QR code');
-    }
-    
-    // Gerar URL para QR code usando API externa (mesmo formato do Bitcoin que funciona)
-    responseData.qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeText)}`;
-    console.log('🔄 QR code URL gerada:', responseData.qrCodeImage.substring(0, 50) + '...');
-    
-    // Garantir que temos o texto do QR code
-    responseData.qrCodeText = qrCodeText;
-}
-
 // Salvar no histórico local (Bitcoin e PIX)
 function saveToLocalHistory(payment) {
+    debugLog("Salvando no histórico local:", payment);
     const payments = JSON.parse(localStorage.getItem('payments') || '[]');
     payments.push(payment);
     localStorage.setItem('payments', JSON.stringify(payments));
 }
 
-// Carregar histórico de pagamentos (Bitcoin e PIX)
-function loadPaymentHistory() {
-    const payments = JSON.parse(localStorage.getItem('payments') || '[]');
-    const historyList = document.getElementById('historyList');
-    const stats = document.getElementById('paymentStats');
-    
-    if (payments.length === 0) {
-        historyList.innerHTML = '<p class="no-data">Nenhum pagamento encontrado no histórico local.</p>';
-        stats.innerHTML = '';
-        return;
-    }
-    
-    // Estatísticas simples
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-    const pendingCount = payments.filter(p => p.status === 'pending').length;
-    const confirmedCount = payments.filter(p => p.status === 'confirmed').length;
-    
-    stats.innerHTML = `
-        <p><strong>Total de Pagamentos:</strong> ${payments.length}</p>
-        <p><strong>Pendentes:</strong> ${pendingCount} | <strong>Confirmados:</strong> ${confirmedCount}</p>
-        <p><strong>Valor Total:</strong> ${totalAmount.toFixed(2)}</p>
-    `;
-    
-    // Lista de pagamentos
-    historyList.innerHTML = payments.map(payment => `
-        <div class="history-item ${payment.status}">
-            <div class="history-info">
-                <span class="history-id">${payment.uniqueId || payment.id}</span>
-                <span class="history-name">${payment.userName}</span>
-                <span class="history-amount">${payment.method === 'bitcoin' ? 
-                    `${payment.amount} satoshis` : `R$ ${payment.amount.toFixed(2)}`}</span>
-                <span class="history-status ${payment.status}">${
-                    payment.status === 'confirmed' ? '✅ Confirmado' : 
-                    payment.status === 'pending' ? '⏳ Pendente' : '❓ Desconhecido'
-                }</span>
-            </div>
-            <div class="history-actions">
-                <button onclick="checkPaymentStatus('${payment.id}')" class="btn-small">
-                    🔄 Verificar
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
 // Mostrar/ocultar loading
 function showLoading(show) {
+    debugLog(`${show ? 'Exibindo' : 'Ocultando'} indicador de loading`);
     loading.style.display = show ? 'block' : 'none';
     paymentFormCard.style.display = show ? 'none' : 'block';
 }
 
 // Sistema de verificação automática de status de pagamento
 function startPaymentStatusPolling(paymentId) {
+    debugLog("Iniciando polling para paymentId:", paymentId);
+    
     // Limpar intervalo anterior se existir
     if (paymentPollingInterval) {
         clearInterval(paymentPollingInterval);
@@ -264,9 +234,10 @@ function startPaymentStatusPolling(paymentId) {
     // Verificar status a cada 5 segundos
     paymentPollingInterval = setInterval(async () => {
         try {
+            debugLog("Verificando status do pagamento...");
             await checkPaymentStatus(paymentId);
         } catch (error) {
-            console.error('Erro na verificação de status:', error);
+            debugLog("ERRO na verificação de status:", error);
         }
     }, 5000);
 }
@@ -277,19 +248,26 @@ async function checkPaymentStatus(paymentId) {
         if (currentPaymentId) {
             paymentId = currentPaymentId;
         } else {
+            debugLog("ERRO: Tentativa de verificar status sem ID de pagamento");
             return;
         }
     }
+    
+    debugLog(`Verificando status do pagamento: ${paymentId}`);
     
     try {
         const response = await fetch(`/payment-status/${paymentId}`);
         const result = await response.json();
         
+        debugLog("Status recebido:", result);
+        
         if (result.success) {
             updatePaymentStatus(result.status, result.data);
+        } else {
+            debugLog("Erro ao verificar status:", result.error);
         }
     } catch (error) {
-        console.error('Erro ao verificar status:', error);
+        debugLog("ERRO na verificação de status:", error);
     }
 }
 
@@ -334,11 +312,13 @@ function updatePaymentStatus(status, paymentData = null) {
         statusElement.classList.add('status-error');
     }
     
-    console.log(`Status atualizado: ${status}`);
+    debugLog(`Status atualizado: ${status}`);
 }
 
 // Exibir resultado do pagamento
 function displayPaymentResult(paymentData) {
+    debugLog("Exibindo resultado do pagamento:", paymentData);
+    
     paymentFormCard.style.display = 'none';
     qrCodeSection.style.display = 'block';
     
@@ -349,39 +329,43 @@ function displayPaymentResult(paymentData) {
     document.getElementById('paymentAmount').textContent = paymentData.method === 'bitcoin' ? 
         `${paymentData.amount.toLocaleString()} satoshis` : `R$ ${paymentData.amount.toFixed(2)}`;
     
-    // Exibir QR Code - usar a imagem gerada pelo servidor, com tratamento de erro aprimorado
+    // Exibir QR Code - usar a imagem gerada pelo servidor
     const qrCodeImage = document.getElementById('qrCodeImage');
-    if (paymentData.qrCodeImage) {
-        qrCodeImage.src = paymentData.qrCodeImage;
-        qrCodeImage.style.display = 'block';
-        
-        // Adicionar tratamento de erro
-        qrCodeImage.onerror = function() {
-            console.error('Erro ao carregar imagem do QR code:', paymentData.qrCodeImage);
+    debugLog("URL do QR Code:", paymentData.qrCodeImage || "AUSENTE!");
+    
+    try {
+        if (paymentData.qrCodeImage) {
+            // Validar URL do QR code
+            if (typeof paymentData.qrCodeImage !== 'string' || !paymentData.qrCodeImage.startsWith('http')) {
+                debugLog("AVISO: URL do QR code parece inválida:", paymentData.qrCodeImage);
+            }
             
-            // Tentar URL alternativa caso a primeira falhe
-            const alternativeUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${
-                encodeURIComponent(paymentData.pixCode || paymentData.lightningInvoice || paymentData.bitcoinUri || currentPaymentId)
-            }`;
+            qrCodeImage.src = paymentData.qrCodeImage;
+            qrCodeImage.style.display = 'block';
             
-            console.log('Tentando URL alternativa para QR code:', alternativeUrl);
-            this.src = alternativeUrl;
-            
-            // Se o segundo método também falhar
-            this.onerror = function() {
-                console.error('Falha também na URL alternativa');
-                this.style.display = 'none';
-                
-                // Mostrar mensagem ao usuário
-                const qrContainer = document.querySelector('.qr-container');
-                const errorMsg = document.createElement('p');
-                errorMsg.innerHTML = `
-                    <strong style="color: #dc3545;">⚠️ Não foi possível exibir o QR code</strong><br>
-                    Por favor, utilize o código ${paymentData.method === 'pix' ? 'PIX' : 'Bitcoin'} abaixo.
-                `;
-                qrContainer.appendChild(errorMsg);
+            // Adicionar event listeners para depurar problemas de carregamento da imagem
+            qrCodeImage.onload = () => debugLog("✅ Imagem do QR code carregada com sucesso");
+            qrCodeImage.onerror = (e) => {
+                debugLog("❌ ERRO ao carregar imagem do QR code:", e);
+                // Tentar carregar novamente com URL alternativa
+                if (paymentData.qrCodeImage && paymentData.qrCodeImage.includes('api.qrserver.com')) {
+                    debugLog("Tentando URL alternativa para o QR code");
+                    qrCodeImage.src = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(paymentData.qrCodeText || paymentData.pixCode || '')}`;
+                }
             };
-        };
+        } else {
+            debugLog("❌ URL do QR code não fornecida, usando gerador alternativo");
+            // QR code não fornecido pelo servidor, gerar alternativo
+            if (paymentData.pixCode || paymentData.qrCodeText) {
+                const qrCodeContent = paymentData.qrCodeText || paymentData.pixCode;
+                qrCodeImage.src = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(qrCodeContent)}`;
+                qrCodeImage.style.display = 'block';
+            } else {
+                debugLog("❌ Impossível gerar QR code, nenhum conteúdo disponível");
+            }
+        }
+    } catch (qrError) {
+        debugLog("❌ Erro ao processar QR code:", qrError);
     }
     
     const detailsDiv = document.getElementById('paymentDetails');
@@ -444,108 +428,14 @@ function displayPaymentResult(paymentData) {
     }
     
     // Iniciar verificação automática de status para qualquer método de pagamento
-    console.log('🔄 Iniciando polling de status para:', paymentData.paymentId);
+    debugLog('Iniciando polling de status para:', paymentData.paymentId);
     startPaymentStatusPolling(paymentData.paymentId);
 }
 
-// Mostrar confirmação de pagamento
-function showPaymentConfirmation(paymentData) {
-    const confirmationDiv = document.createElement('div');
-    confirmationDiv.className = 'payment-confirmation';
-    confirmationDiv.innerHTML = `
-        <div class="confirmation-content">
-            <h3>🎉 Pagamento Confirmado!</h3>
-            <p>Seu pagamento foi confirmado com sucesso.</p>
-            <button onclick="this.closest('.payment-confirmation').remove()">Fechar</button>
-        </div>
-    `;
-    document.body.appendChild(confirmationDiv);
-}
-
-// Exibir erro de pagamento
-function showPaymentError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'payment-confirmation'; // Reutilizar o estilo
-    errorDiv.innerHTML = `
-        <div class="confirmation-content" style="border-top: 5px solid #dc3545;">
-            <h3>❌ Erro no Pagamento</h3>
-            <p>${message}</p>
-            <button onclick="this.closest('.payment-confirmation').remove()">Fechar</button>
-        </div>
-    `;
-    document.body.appendChild(errorDiv);
-}
-
-// Limpar histórico
-function clearHistory() {
-    if (confirm('Tem certeza que deseja limpar todo o histórico de pagamentos? Esta ação não pode ser desfeita.')) {
-        localStorage.removeItem('payments');
-        loadPaymentHistory();
-    }
-}
-
-// Novo pagamento
-function newPayment() {
-    // Resetar variáveis
-    currentPaymentId = null;
-    stopStatusPolling();
-    
-    // Limpar formulário
-    paymentForm.reset();
-    
-    // Mostrar formulário e ocultar QR code
-    paymentFormCard.style.display = 'block';
-    qrCodeSection.style.display = 'none';
-    
-    // Remover mensagem de sucesso se existir
-    const successMessage = document.querySelector('.payment-confirmation');
-    if (successMessage) {
-        successMessage.remove();
-    }
-    
-    // Rolar para o topo
-    window.scrollTo(0, 0);
-    
-    // Inicializar com o método selecionado
-    const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked');
-    if (selectedMethod) {
-        updatePaymentInterface(selectedMethod.value);
-    }
-}
-
-// Parar polling de status
-function stopStatusPolling() {
-    if (paymentPollingInterval) {
-        clearInterval(paymentPollingInterval);
-        paymentPollingInterval = null;
-    }
-}
-
-// Exportar pagamentos
-function exportPayments() {
-    const payments = JSON.parse(localStorage.getItem('payments') || '[]');
-    if (payments.length === 0) {
-        alert('Não há pagamentos para exportar.');
-        return;
-    }
-    
-    const dataStr = JSON.stringify(payments, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    
-    const exportDate = new Date().toISOString().slice(0, 10);
-    const exportFileName = `livetip-pagamentos-${exportDate}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileName);
-    linkElement.style.display = 'none';
-    document.body.appendChild(linkElement);
-    linkElement.click();
-    document.body.removeChild(linkElement);
-}
-
-// Copiar para área de transferência
+// Utilidade para copiar texto para a área de transferência
 function copyToClipboard(text, message) {
+    debugLog("Copiando para área de transferência:", text.substring(0, 30) + "...");
+    
     // Criar elemento temporário
     const temp = document.createElement('textarea');
     temp.value = text;
@@ -564,6 +454,8 @@ function copyToClipboard(text, message) {
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
+    debugLog("DOM carregado, inicializando script de debug");
+    
     // Configurar evento de mudança do método de pagamento
     const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
     paymentMethodRadios.forEach(radio => {
@@ -577,4 +469,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (selectedMethod) {
         updatePaymentInterface(selectedMethod.value);
     }
+    
+    // Verificar se a imagem do QR code existe e está funcionando
+    const qrCodeImage = document.getElementById('qrCodeImage');
+    if (qrCodeImage) {
+        debugLog("Elemento de imagem QR code encontrado");
+    } else {
+        debugLog("ERRO: Elemento de imagem QR code não encontrado no DOM");
+    }
 });
+
+debugLog("Script de debug carregado com sucesso");

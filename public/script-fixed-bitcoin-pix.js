@@ -1,5 +1,5 @@
+// script-fixed-bitcoin-pix.js
 // Script corrigido unificando o tratamento de PIX e Bitcoin baseado no código que funciona
-// Atualizado em 12/06/2025 - Correção do problema de QR code PIX em produção (Vercel)
 
 let currentPaymentId = null;
 let currentUniqueId = null;
@@ -52,66 +52,99 @@ function updatePaymentInterface(paymentMethod) {
         currentUniqueId = generateUniqueId();
         uniqueIdInput.value = currentUniqueId;
         
-        amountLabel.textContent = '⚡ Valor (Satoshis):';
-        amountInput.min = BITCOIN_CONFIG.MIN_SATOSHIS;
+        amountLabel.textContent = '💰 Valor (satoshis):';
         amountInput.step = '1';
+        amountInput.min = BITCOIN_CONFIG.MIN_SATOSHIS;
         amountInput.placeholder = '1000';
         
-        satoshiValues.style.display = 'block';
+        if (satoshiValues) satoshiValues.style.display = 'block';
         if (pixValues) pixValues.style.display = 'none';
+        
     } else if (paymentMethod === 'pix') {
-        uniqueIdGroup.style.display = 'block';
+        uniqueIdGroup.style.display = 'none';
         currentUniqueId = generatePixUniqueId();
         uniqueIdInput.value = currentUniqueId;
         
         amountLabel.textContent = '💵 Valor (R$):';
-        amountInput.min = '1';
         amountInput.step = '1';
-        amountInput.placeholder = '2';
+        amountInput.min = PIX_CONFIG.MIN_REAIS;
+        amountInput.placeholder = '2.00';
         
+        if (satoshiValues) satoshiValues.style.display = 'none';
         if (pixValues) pixValues.style.display = 'block';
-        satoshiValues.style.display = 'none';
-    } else {
-        uniqueIdGroup.style.display = 'none';
-        currentUniqueId = null;
-        amountLabel.textContent = '💵 Valor (R$):';
-        amountInput.min = '0.01';
-        amountInput.step = '0.01';
-        amountInput.placeholder = '10.00';
-        satoshiValues.style.display = 'none';
-        if (pixValues) pixValues.style.display = 'none';
     }
 }
 
-// Submissão do formulário
-paymentForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
+// Selecionar valores pré-definidos para PIX
+function selectPixValue(value) {
+    const amountInput = document.getElementById('amount');
+    amountInput.value = value;
+}
+
+// Selecionar valores pré-definidos para Bitcoin
+function selectBitcoinValue(value) {
+    const amountInput = document.getElementById('amount');
+    amountInput.value = value;
+}
+
+// Mostrar/ocultar indicador de carregamento
+function showLoading(show) {
+    if (loading) {
+        loading.style.display = show ? 'block' : 'none';
+    }
+}
+
+// Enviar formulário
+async function submitPaymentForm(event) {
+    if (event) event.preventDefault();
+
+    showLoading(true);
     
-    const formData = new FormData(paymentForm);
-    const paymentMethod = formData.get('paymentMethod');
-    const amount = parseFloat(formData.get('amount'));
+    // Obter valores do formulário
+    const userName = document.getElementById('userName').value;
+    const amount = Number(document.getElementById('amount').value);
+    const paymentMethodEl = document.querySelector('input[name="paymentMethod"]:checked');
     
-    const data = {
-        userName: formData.get('userName'),
-        amount: amount,
-        paymentMethod: paymentMethod,
-        uniqueId: currentUniqueId
-    };
-    
-    // Validar valor mínimo para Bitcoin (em satoshis)
-    if (paymentMethod === 'bitcoin' && amount < BITCOIN_CONFIG.MIN_SATOSHIS) {
-        alert(`⚠️ Para pagamentos Bitcoin, o mínimo é ${BITCOIN_CONFIG.MIN_SATOSHIS} satoshis`);
+    if (!userName || !paymentMethodEl || !amount) {
+        alert('Por favor, preencha todos os campos');
+        showLoading(false);
         return;
     }
     
-    // Validar valores PIX (R$ 1, 2, 3, 4)
+    const paymentMethod = paymentMethodEl.value;
+    
+    // Construir dados do pagamento
+    const data = {
+        userName,
+        paymentMethod,
+        amount
+    };
+    
+    // Adicionar uniqueId para Bitcoin
+    if (paymentMethod === 'bitcoin') {
+        data.uniqueId = document.getElementById('uniqueId').value;
+        currentUniqueId = data.uniqueId;
+    } else if (paymentMethod === 'pix') {
+        // Sem uniqueId para PIX, usado apenas para Bitcoin no backend
+        currentUniqueId = null;
+    }
+    
+    // Validação personalizada para Bitcoin
+    if (paymentMethod === 'bitcoin' && amount < BITCOIN_CONFIG.MIN_SATOSHIS) {
+        alert(`⚠️ Para pagamentos Bitcoin, o mínimo é ${BITCOIN_CONFIG.MIN_SATOSHIS} satoshis`);
+        showLoading(false);
+        return;
+    }
+    
+    // Validação personalizada para PIX
     if (paymentMethod === 'pix' && !PIX_CONFIG.PREDEFINED_VALUES.includes(amount)) {
         alert(`⚠️ Para pagamentos PIX, selecione um dos valores: R$ ${PIX_CONFIG.PREDEFINED_VALUES.join(', ')}`);
+        showLoading(false);
         return;
     }
     
     try {
-        showLoading(true);
+        console.log('📤 Enviando dados para gerar QR code:', data);
         
         const response = await fetch('/generate-qr', {
             method: 'POST',
@@ -124,40 +157,41 @@ paymentForm.addEventListener('submit', async (e) => {
         const result = await response.json();
         
         if (result.success) {
+            console.log('✅ QR code gerado com sucesso:', result);
             currentPaymentId = result.data.paymentId;
             
-            // Modificar resposta para garantir compatibilidade com ambientes locais e produção
+            // CORREÇÃO AQUI: Tratar da mesma forma que Bitcoin
             const responseData = result.data;
             
-            // Garantir que temos os dados necessários para QR code
+            // Garantir que temos os dados necessários para QR code (mesma lógica que funciona para Bitcoin)
             ensureQRCodeData(responseData, paymentMethod);
             
-            // Exibir resultado com os dados tratados
+            // Exibir resultado
             displayPaymentResult(responseData);
             
-            // Salvar no histórico local para Bitcoin e PIX
-            if (paymentMethod === 'bitcoin' || paymentMethod === 'pix') {
-                saveToLocalHistory({
-                    id: currentPaymentId,
-                    uniqueId: currentUniqueId,
-                    userName: data.userName,
-                    amount: amount,
-                    status: 'pending',
-                    timestamp: new Date().toISOString(),
-                    method: paymentMethod
-                });
-            }
+            // Salvar no histórico local para ambos os métodos
+            saveToLocalHistory({
+                id: currentPaymentId,
+                uniqueId: currentUniqueId,
+                userName: data.userName,
+                amount: amount,
+                status: 'pending',
+                timestamp: new Date().toISOString(),
+                method: paymentMethod
+            });
         } else {
+            console.error('❌ Erro ao gerar QR Code:', result.error);
             alert('Erro ao gerar QR Code: ' + result.error);
         }
     } catch (error) {
-        alert('Erro na requisição: ' + error.message);
+        console.error('❌ Erro ao gerar QR Code:', error);
+        alert('Erro na comunicação com o servidor. Por favor, tente novamente.');
     } finally {
         showLoading(false);
     }
-});
+}
 
-// Garantir que temos os dados necessários para exibir o QR code
+// FUNÇÃO CRÍTICA: Garantir dados do QR code (baseado no que funciona para Bitcoin)
 function ensureQRCodeData(responseData, paymentMethod) {
     console.log('🔄 Verificando dados do QR code para', paymentMethod);
     
@@ -192,62 +226,67 @@ function ensureQRCodeData(responseData, paymentMethod) {
     responseData.qrCodeText = qrCodeText;
 }
 
-// Salvar no histórico local (Bitcoin e PIX)
+// Salvar no histórico local
 function saveToLocalHistory(payment) {
-    const payments = JSON.parse(localStorage.getItem('payments') || '[]');
-    payments.push(payment);
-    localStorage.setItem('payments', JSON.stringify(payments));
-}
-
-// Carregar histórico de pagamentos (Bitcoin e PIX)
-function loadPaymentHistory() {
-    const payments = JSON.parse(localStorage.getItem('payments') || '[]');
-    const historyList = document.getElementById('historyList');
-    const stats = document.getElementById('paymentStats');
-    
-    if (payments.length === 0) {
-        historyList.innerHTML = '<p class="no-data">Nenhum pagamento encontrado no histórico local.</p>';
-        stats.innerHTML = '';
-        return;
+    try {
+        const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+        payments.push(payment);
+        localStorage.setItem('payments', JSON.stringify(payments));
+        console.log('💾 Pagamento salvo no histórico local:', payment.id);
+    } catch (e) {
+        console.error('❌ Erro ao salvar no histórico local:', e);
     }
-    
-    // Estatísticas simples
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-    const pendingCount = payments.filter(p => p.status === 'pending').length;
-    const confirmedCount = payments.filter(p => p.status === 'confirmed').length;
-    
-    stats.innerHTML = `
-        <p><strong>Total de Pagamentos:</strong> ${payments.length}</p>
-        <p><strong>Pendentes:</strong> ${pendingCount} | <strong>Confirmados:</strong> ${confirmedCount}</p>
-        <p><strong>Valor Total:</strong> ${totalAmount.toFixed(2)}</p>
-    `;
-    
-    // Lista de pagamentos
-    historyList.innerHTML = payments.map(payment => `
-        <div class="history-item ${payment.status}">
-            <div class="history-info">
-                <span class="history-id">${payment.uniqueId || payment.id}</span>
-                <span class="history-name">${payment.userName}</span>
-                <span class="history-amount">${payment.method === 'bitcoin' ? 
-                    `${payment.amount} satoshis` : `R$ ${payment.amount.toFixed(2)}`}</span>
-                <span class="history-status ${payment.status}">${
-                    payment.status === 'confirmed' ? '✅ Confirmado' : 
-                    payment.status === 'pending' ? '⏳ Pendente' : '❓ Desconhecido'
-                }</span>
-            </div>
-            <div class="history-actions">
-                <button onclick="checkPaymentStatus('${payment.id}')" class="btn-small">
-                    🔄 Verificar
-                </button>
-            </div>
-        </div>
-    `).join('');
 }
 
-// Mostrar/ocultar loading
-function showLoading(show) {
-    loading.style.display = show ? 'block' : 'none';
-    paymentFormCard.style.display = show ? 'none' : 'block';
+// Carregar histórico de pagamentos
+function loadPaymentHistory() {
+    try {
+        const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+        const historyList = document.getElementById('historyList');
+        const stats = document.getElementById('paymentStats');
+        
+        if (!historyList || !stats) return; // Elementos não encontrados
+        
+        if (payments.length === 0) {
+            historyList.innerHTML = '<p class="no-data">Nenhum pagamento encontrado no histórico local.</p>';
+            stats.innerHTML = '';
+            return;
+        }
+        
+        // Estatísticas simples
+        const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+        const pendingCount = payments.filter(p => p.status === 'pending').length;
+        const confirmedCount = payments.filter(p => p.status === 'confirmed').length;
+        
+        stats.innerHTML = `
+            <p><strong>Total de Pagamentos:</strong> ${payments.length}</p>
+            <p><strong>Pendentes:</strong> ${pendingCount} | <strong>Confirmados:</strong> ${confirmedCount}</p>
+            <p><strong>Valor Total:</strong> ${totalAmount.toFixed(2)}</p>
+        `;
+        
+        // Lista de pagamentos
+        historyList.innerHTML = payments.map(payment => `
+            <div class="history-item ${payment.status}">
+                <div class="history-info">
+                    <span class="history-id">${payment.uniqueId || payment.id}</span>
+                    <span class="history-name">${payment.userName}</span>
+                    <span class="history-amount">${payment.method === 'bitcoin' ? 
+                        `${payment.amount} satoshis` : `R$ ${payment.amount.toFixed(2)}`}</span>
+                    <span class="history-status ${payment.status}">${
+                        payment.status === 'confirmed' ? '✅ Confirmado' : 
+                        payment.status === 'pending' ? '⏳ Pendente' : '❓ Desconhecido'
+                    }</span>
+                </div>
+                <div class="history-actions">
+                    <button onclick="checkPaymentStatus('${payment.id}')" class="btn-small">
+                        🔄 Verificar
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('❌ Erro ao carregar histórico local:', e);
+    }
 }
 
 // Sistema de verificação automática de status de pagamento
@@ -266,7 +305,7 @@ function startPaymentStatusPolling(paymentId) {
         try {
             await checkPaymentStatus(paymentId);
         } catch (error) {
-            console.error('Erro na verificação de status:', error);
+            console.error('❌ Erro na verificação de status:', error);
         }
     }, 5000);
 }
@@ -277,35 +316,43 @@ async function checkPaymentStatus(paymentId) {
         if (currentPaymentId) {
             paymentId = currentPaymentId;
         } else {
+            console.log('⚠️ Nenhum ID de pagamento para verificar');
             return;
         }
     }
     
     try {
+        console.log(`🔍 Verificando status do pagamento: ${paymentId}`);
         const response = await fetch(`/payment-status/${paymentId}`);
         const result = await response.json();
         
         if (result.success) {
-            updatePaymentStatus(result.status, result.data);
+            console.log(`✅ Status recebido: ${result.data.status}`);
+            updatePaymentStatus(result.data.status, result.data);
+        } else {
+            console.error('❌ Erro ao verificar status:', result.error);
         }
     } catch (error) {
-        console.error('Erro ao verificar status:', error);
+        console.error('❌ Erro na requisição de status:', error.message);
     }
 }
 
 // Atualizar UI com novo status do pagamento
 function updatePaymentStatus(status, paymentData = null) {
-    currentPaymentStatus = status;
     const statusElement = document.getElementById('paymentStatus');
+    if (!statusElement) return;
+    
+    currentPaymentStatus = status;
     
     // Remover classes anteriores
     statusElement.classList.remove('status-pending', 'status-confirmed', 'status-expired', 'status-error');
     
     if (status === 'pending') {
-        statusElement.textContent = 'Aguardando pagamento';
+        statusElement.textContent = '⏳ Aguardando pagamento...';
         statusElement.classList.add('status-pending');
+        
     } else if (status === 'confirmed' || status === 'completed') {
-        statusElement.textContent = '✅ Pagamento confirmado';
+        statusElement.textContent = '✅ Pagamento confirmado!';
         statusElement.classList.add('status-confirmed');
         
         // Parar polling
@@ -326,19 +373,23 @@ function updatePaymentStatus(status, paymentData = null) {
             payments[index].status = 'confirmed';
             localStorage.setItem('payments', JSON.stringify(payments));
         }
+        
     } else if (status === 'expired') {
         statusElement.textContent = '⏰ Pagamento expirado';
         statusElement.classList.add('status-expired');
+        
     } else {
         statusElement.textContent = '❌ Erro no pagamento';
         statusElement.classList.add('status-error');
     }
     
-    console.log(`Status atualizado: ${status}`);
+    console.log(`📊 Status atualizado: ${status}`);
 }
 
 // Exibir resultado do pagamento
 function displayPaymentResult(paymentData) {
+    if (!qrCodeSection || !paymentFormCard) return;
+    
     paymentFormCard.style.display = 'none';
     qrCodeSection.style.display = 'block';
     
@@ -349,27 +400,27 @@ function displayPaymentResult(paymentData) {
     document.getElementById('paymentAmount').textContent = paymentData.method === 'bitcoin' ? 
         `${paymentData.amount.toLocaleString()} satoshis` : `R$ ${paymentData.amount.toFixed(2)}`;
     
-    // Exibir QR Code - usar a imagem gerada pelo servidor, com tratamento de erro aprimorado
+    // Exibir QR Code com tratamento de erro robusto
     const qrCodeImage = document.getElementById('qrCodeImage');
     if (paymentData.qrCodeImage) {
         qrCodeImage.src = paymentData.qrCodeImage;
         qrCodeImage.style.display = 'block';
         
-        // Adicionar tratamento de erro
+        // Tratamento de erro para carregamento da imagem
         qrCodeImage.onerror = function() {
-            console.error('Erro ao carregar imagem do QR code:', paymentData.qrCodeImage);
+            console.error('❌ Erro ao carregar imagem do QR code:', paymentData.qrCodeImage);
             
-            // Tentar URL alternativa caso a primeira falhe
+            // Tentar URL alternativa
             const alternativeUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${
                 encodeURIComponent(paymentData.pixCode || paymentData.lightningInvoice || paymentData.bitcoinUri || currentPaymentId)
             }`;
             
-            console.log('Tentando URL alternativa para QR code:', alternativeUrl);
+            console.log('🔄 Tentando URL alternativa para QR code:', alternativeUrl);
             this.src = alternativeUrl;
             
-            // Se o segundo método também falhar
+            // Tratamento caso a segunda tentativa também falhe
             this.onerror = function() {
-                console.error('Falha também na URL alternativa');
+                console.error('❌ Falha também na URL alternativa');
                 this.style.display = 'none';
                 
                 // Mostrar mensagem ao usuário
@@ -384,10 +435,11 @@ function displayPaymentResult(paymentData) {
         };
     }
     
+    // Detalhes específicos do método de pagamento
     const detailsDiv = document.getElementById('paymentDetails');
     
-    // Exibir detalhes baseado no método
     if (paymentData.method === 'bitcoin') {
+        // Bitcoin segue exatamente o padrão atual (funciona)
         const isLiveTip = paymentData.source === 'livetip';
         const sourceText = isLiveTip ? 'processado pela LiveTip' : 'geração local (fallback)';
         const codeLabel = isLiveTip ? 'Lightning Invoice' : 'Bitcoin URI';
@@ -396,7 +448,7 @@ function displayPaymentResult(paymentData) {
         detailsDiv.innerHTML = `
             <p><strong>₿ Pagamento Bitcoin ${isLiveTip ? 'Lightning via LiveTip' : '(Local)'}</strong></p>
             <p><strong>👤 Nome:</strong> ${paymentData.userName}</p>
-            <p><strong>🔑 ID Único:</strong> <code>${paymentData.uniqueId}</code></p>
+            <p><strong>🔑 ID Único:</strong> <code>${paymentData.uniqueId || paymentData.id}</code></p>
             <p><strong>⚡ Valor:</strong> ${paymentData.amount.toLocaleString()} satoshis</p>
             ${paymentData.bitcoinAddress ? `<p><strong>📍 Endereço:</strong> ${paymentData.bitcoinAddress}</p>` : ''}
             <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 5px 0;">
@@ -418,13 +470,14 @@ function displayPaymentResult(paymentData) {
             </p>
         `;
     } else {
-        // PIX (mantém lógica original)
+        // PIX (usando a mesma estrutura do Bitcoin que funciona)
         const isLiveTip = paymentData.source === 'livetip';
-        const sourceText = isLiveTip ? 'processada via LiveTip/EFI Bank' : 'geração local (fallback)';
+        const sourceText = isLiveTip ? 'processado pela LiveTip' : 'geração local (fallback)';
         
         detailsDiv.innerHTML = `
-            <p><strong>🏦 PIX ${isLiveTip ? 'via LiveTip/EFI Bank' : '(Local)'}</strong></p>
-            <p><strong>Valor:</strong> R$ ${paymentData.amount}</p>
+            <p><strong>🏦 PIX ${isLiveTip ? 'via LiveTip' : '(Local)'}</strong></p>
+            <p><strong>👤 Nome:</strong> ${paymentData.userName}</p>
+            <p><strong>💰 Valor:</strong> R$ ${paymentData.amount.toFixed(2)}</p>
             <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 5px 0;">
                 <p><strong>Código PIX:</strong></p>
                 <textarea readonly style="width: 100%; height: 60px; font-family: monospace; font-size: 0.8rem;" 
@@ -433,7 +486,8 @@ function displayPaymentResult(paymentData) {
                     style="margin-top: 5px; padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">
                     📋 Copiar Código PIX
                 </button>
-            </div>            <p style="font-size: 0.9rem; color: #666;">
+            </div>
+            <p style="font-size: 0.9rem; color: #666;">
                 <strong>💡 Como pagar:</strong><br>
                 1. Abra seu app bancário<br>
                 2. Escaneie o QR Code ou copie o código PIX<br>
@@ -443,7 +497,7 @@ function displayPaymentResult(paymentData) {
         `;
     }
     
-    // Iniciar verificação automática de status para qualquer método de pagamento
+    // Iniciar verificação automática de status
     console.log('🔄 Iniciando polling de status para:', paymentData.paymentId);
     startPaymentStatusPolling(paymentData.paymentId);
 }
@@ -465,7 +519,7 @@ function showPaymentConfirmation(paymentData) {
 // Exibir erro de pagamento
 function showPaymentError(message) {
     const errorDiv = document.createElement('div');
-    errorDiv.className = 'payment-confirmation'; // Reutilizar o estilo
+    errorDiv.className = 'payment-confirmation';
     errorDiv.innerHTML = `
         <div class="confirmation-content" style="border-top: 5px solid #dc3545;">
             <h3>❌ Erro no Pagamento</h3>
@@ -491,11 +545,11 @@ function newPayment() {
     stopStatusPolling();
     
     // Limpar formulário
-    paymentForm.reset();
+    if (paymentForm) paymentForm.reset();
     
     // Mostrar formulário e ocultar QR code
-    paymentFormCard.style.display = 'block';
-    qrCodeSection.style.display = 'none';
+    if (paymentFormCard) paymentFormCard.style.display = 'block';
+    if (qrCodeSection) qrCodeSection.style.display = 'none';
     
     // Remover mensagem de sucesso se existir
     const successMessage = document.querySelector('.payment-confirmation');
@@ -523,25 +577,30 @@ function stopStatusPolling() {
 
 // Exportar pagamentos
 function exportPayments() {
-    const payments = JSON.parse(localStorage.getItem('payments') || '[]');
-    if (payments.length === 0) {
-        alert('Não há pagamentos para exportar.');
-        return;
+    try {
+        const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+        if (payments.length === 0) {
+            alert('Não há pagamentos para exportar.');
+            return;
+        }
+        
+        const dataStr = JSON.stringify(payments, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+        
+        const exportDate = new Date().toISOString().slice(0, 10);
+        const exportFileName = `livetip-pagamentos-${exportDate}.json`;
+        
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileName);
+        linkElement.style.display = 'none';
+        document.body.appendChild(linkElement);
+        linkElement.click();
+        document.body.removeChild(linkElement);
+    } catch (e) {
+        console.error('❌ Erro ao exportar pagamentos:', e);
+        alert('Erro ao exportar pagamentos.');
     }
-    
-    const dataStr = JSON.stringify(payments, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    
-    const exportDate = new Date().toISOString().slice(0, 10);
-    const exportFileName = `livetip-pagamentos-${exportDate}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileName);
-    linkElement.style.display = 'none';
-    document.body.appendChild(linkElement);
-    linkElement.click();
-    document.body.removeChild(linkElement);
 }
 
 // Copiar para área de transferência
@@ -555,16 +614,41 @@ function copyToClipboard(text, message) {
     temp.select();
     document.execCommand('copy');
     
-    // Remover elemento
+    // Remover elemento temporário
     document.body.removeChild(temp);
     
-    // Mostrar mensagem
-    alert(message);
+    // Mostrar mensagem de confirmação
+    alert(message || 'Texto copiado!');
 }
 
-// Inicialização
+// Inicialização - quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', function() {
-    // Configurar evento de mudança do método de pagamento
+    console.log('🚀 Inicializando aplicação...');
+    
+    // Inicializar interface com método PIX por padrão
+    const pixRadio = document.querySelector('input[name="paymentMethod"][value="pix"]');
+    if (pixRadio) {
+        pixRadio.checked = true;
+        updatePaymentInterface('pix');
+    }
+    
+    // Event listeners para botões de valor PIX
+    document.querySelectorAll('.pix-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const value = parseFloat(this.getAttribute('data-pix'));
+            selectPixValue(value);
+        });
+    });
+    
+    // Event listeners para botões de valor Bitcoin
+    document.querySelectorAll('.bitcoin-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const value = parseInt(this.getAttribute('data-satoshi'));
+            selectBitcoinValue(value);
+        });
+    });
+    
+    // Event listener para mudança de método de pagamento
     const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
     paymentMethodRadios.forEach(radio => {
         radio.addEventListener('change', function() {
@@ -572,9 +656,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Inicializar com o método selecionado
-    const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked');
-    if (selectedMethod) {
-        updatePaymentInterface(selectedMethod.value);
+    // Event listener para formulário
+    if (paymentForm) {
+        paymentForm.addEventListener('submit', submitPaymentForm);
     }
+    
+    // Carregar histórico de pagamentos
+    loadPaymentHistory();
+    
+    console.log('✅ Aplicação inicializada com sucesso');
 });

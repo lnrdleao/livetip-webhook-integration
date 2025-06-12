@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Correção QR Code PIX e Bitcoin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        h1, h2, h3 {
+            color: #333;
+        }
+        
+        .header {
+            background: #2f3c48;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
+            gap: 20px;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        .btn-bitcoin {
+            background: #f7931a;
+        }
+        
+        .btn-pix {
+            background: #32bcad;
+        }
+        
+        .log-panel {
+            background: #212529;
+            color: #8ff0a4;
+            font-family: monospace;
+            padding: 15px;
+            border-radius: 5px;
+            height: 250px;
+            overflow: auto;
+            margin-top: 10px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #495057;
+            padding-bottom: 5px;
+        }
+        
+        .error {
+            color: #ff7b7b;
+        }
+        
+        .warning {
+            color: #ffcc00;
+        }
+        
+        .info {
+            color: #8ff0a4;
+        }
+        
+        .qr-codes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .qr-display {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            background: white;
+            width: 300px;
+        }
+        
+        .qr-display img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 80px;
+            font-family: monospace;
+            margin-top: 10px;
+            padding: 8px;
+        }
+        
+        .status-label {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Teste de Correção QR Code PIX e Bitcoin</h1>
+        <p>Esta ferramenta testa a correção aplicada para garantir que o QR code funcione em ambos os ambientes</p>
+    </div>
+    
+    <div class="grid">
+        <div class="card">
+            <h2>🧪 Testes de QR Code</h2>
+            <p>Gere QR codes para testar a solução nos vários cenários:</p>
+            
+            <div>
+                <h3>Bitcoin</h3>
+                <button class="btn btn-bitcoin" onclick="testQRCode('bitcoin', 'mock:api')">Testar QR Bitcoin (API)</button>
+                <button class="btn btn-bitcoin" onclick="testQRCode('bitcoin', 'mock:fallback')">Testar QR Bitcoin (Fallback)</button>
+                <button class="btn btn-bitcoin" onclick="testQRCode('bitcoin', 'mock:error')">Testar QR Bitcoin (Erro)</button>
+            </div>
+            
+            <div style="margin-top: 15px;">
+                <h3>PIX</h3>
+                <button class="btn btn-pix" onclick="testQRCode('pix', 'mock:api')">Testar QR PIX (API)</button>
+                <button class="btn btn-pix" onclick="testQRCode('pix', 'mock:fallback')">Testar QR PIX (Fallback)</button>
+                <button class="btn btn-pix" onclick="testQRCode('pix', 'mock:error')">Testar QR PIX (Erro)</button>
+            </div>
+            
+            <div style="margin-top: 15px;">
+                <h3>Teste Completo</h3>
+                <button class="btn" onclick="runAllTests()">Executar Todos os Testes</button>
+                <button class="btn" onclick="clearLogs()">Limpar Logs</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📊 Logs</h2>
+            <div class="log-panel" id="logPanel"></div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>🖼️ QR Codes Gerados</h2>
+        <div class="qr-codes" id="qrCodes">
+            <!-- Os QR codes serão exibidos aqui -->
+        </div>
+    </div>
+    
+    <script>
+        // Logs
+        function log(message, type = 'info') {
+            const logPanel = document.getElementById('logPanel');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `[${timestamp}] ${message}`;
+            logPanel.appendChild(entry);
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logPanel').innerHTML = '';
+            document.getElementById('qrCodes').innerHTML = '';
+            log('Logs e QR codes limpos');
+        }
+        
+        // Mock de dados de resposta para simular diferentes cenários
+        function getMockResponse(method, scenario) {
+            // IDs comuns
+            const uniqueId = method === 'bitcoin' ? `BTC_TEST_${Date.now()}` : `PIX_TEST_${Date.now()}`;
+            const paymentId = `PMT_${Date.now()}`;
+            
+            // Dados base
+            const baseData = {
+                paymentId,
+                userName: 'Tester',
+                amount: method === 'bitcoin' ? 1000 : 2,
+                uniqueId,
+                method,
+                source: scenario === 'mock:api' ? 'livetip' : 'fallback-local',
+                createdAt: new Date().toISOString()
+            };
+            
+            // Dados específicos por método
+            if (method === 'bitcoin') {
+                if (scenario === 'mock:api') {
+                    // Mock de resposta da API para Bitcoin
+                    return {
+                        success: true,
+                        data: {
+                            ...baseData,
+                            satoshis: 1000,
+                            lightningInvoice: 'lnbc10u1p3xnhl2pp5jptserfk2gjd0bg...',
+                            qrCodeImage: 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=lnbc10u1p3xnhl2pp5jptserfk2gjd0bg'
+                        }
+                    };
+                } else if (scenario === 'mock:fallback') {
+                    // Mock de fallback para Bitcoin
+                    return {
+                        success: true,
+                        data: {
+                            ...baseData,
+                            satoshis: 1000,
+                            bitcoinUri: 'bitcoin:bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh?amount=0.00001000',
+                            bitcoinAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+                            // QR code ausente propositalmente para testar o fallback
+                        }
+                    };
+                } else {
+                    // Mock de erro para Bitcoin
+                    return {
+                        success: false,
+                        error: 'Erro interno do servidor',
+                        details: 'Falha na comunicação com LiveTip API'
+                    };
+                }
+            } else {
+                // PIX
+                if (scenario === 'mock:api') {
+                    // Mock de resposta da API para PIX
+                    return {
+                        success: true,
+                        data: {
+                            ...baseData,
+                            pixCode: '00020126580014BR.GOV.BCB.PIX01...',
+                            qrCodeImage: 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=00020126580014BR.GOV.BCB.PIX01...'
+                        }
+                    };
+                } else if (scenario === 'mock:fallback') {
+                    // Mock de fallback para PIX
+                    return {
+                        success: true,
+                        data: {
+                            ...baseData,
+                            pixCode: '00020126580014BR.GOV.BCB.PIX01...',
+                            // QR code ausente propositalmente para testar o fallback
+                        }
+                    };
+                } else {
+                    // Mock de erro para PIX
+                    return {
+                        success: false,
+                        error: 'Erro interno do servidor',
+                        details: 'Falha na comunicação com LiveTip API'
+                    };
+                }
+            }
+        }
+        
+        // Função para garantir que temos os dados do QR code (importada do script corrigido)
+        function ensureQRCodeData(responseData, paymentMethod) {
+            log(`Verificando QR code para ${paymentMethod}`);
+            
+            // Se já temos uma URL válida de QR code, não fazemos nada
+            if (responseData.qrCodeImage && typeof responseData.qrCodeImage === 'string' && 
+                (responseData.qrCodeImage.startsWith('http') || responseData.qrCodeImage.startsWith('data:image'))) {
+                log(`QR code URL encontrada: ${responseData.qrCodeImage.substring(0, 30)}...`, 'info');
+                return;
+            }
+            
+            log('QR code ausente ou inválido, gerando fallback...', 'warning');
+            
+            // Determinar o texto para o QR code baseado no método de pagamento
+            let qrCodeText = '';
+            
+            if (paymentMethod === 'pix' && responseData.pixCode) {
+                qrCodeText = responseData.pixCode;
+                log('Usando código PIX para QR code');
+            } else if (paymentMethod === 'bitcoin') {
+                qrCodeText = responseData.lightningInvoice || responseData.bitcoinUri || '';
+                log('Usando Bitcoin Invoice/URI para QR code');
+            } else {
+                qrCodeText = `Payment ID: ${responseData.paymentId}`;
+                log('Usando ID como fallback para QR code', 'warning');
+            }
+            
+            // Gerar URL para QR code usando API externa
+            responseData.qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeText)}`;
+            log(`QR code URL gerada: ${responseData.qrCodeImage.substring(0, 30)}...`);
+            
+            // Garantir que temos o texto do QR code
+            responseData.qrCodeText = qrCodeText;
+        }
+        
+        // Testar a geração de QR code
+        function testQRCode(method, scenario) {
+            log(`📋 Testando QR code ${method.toUpperCase()} (${scenario})...`);
+            
+            try {
+                // Obter mock de dados para o cenário
+                const response = getMockResponse(method, scenario);
+                
+                if (!response.success) {
+                    log(`❌ Erro: ${response.error} - ${response.details}`, 'error');
+                    return;
+                }
+                
+                log(`✅ Resposta de dados recebida para ${method}`);
+                
+                // Aplicar a correção (função importada do script)
+                ensureQRCodeData(response.data, method);
+                
+                // Verificar se a correção funcionou
+                if (response.data.qrCodeImage) {
+                    log(`✅ QR code gerado com sucesso: ${response.data.qrCodeImage.substring(0, 30)}...`);
+                    
+                    // Exibir o QR code na página
+                    displayQRCode(response.data, method, scenario);
+                } else {
+                    log('❌ Falha na geração do QR code', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        }
+        
+        // Exibir QR code gerado
+        function displayQRCode(paymentData, method, scenario) {
+            const container = document.getElementById('qrCodes');
+            
+            // Criar elemento para exibir o QR code
+            const qrDisplay = document.createElement('div');
+            qrDisplay.className = 'qr-display';
+            
+            // Status label
+            const statusClass = scenario === 'mock:api' ? 'status-success' : 
+                                scenario === 'mock:fallback' ? 'status-pending' : 'status-error';
+            const statusText = scenario === 'mock:api' ? 'API' : 
+                             scenario === 'mock:fallback' ? 'Fallback' : 'Erro';
+            
+            // Título e status
+            qrDisplay.innerHTML = `
+                <h3>${method === 'bitcoin' ? 'Bitcoin' : 'PIX'} 
+                <span class="status-label ${statusClass}">${statusText}</span></h3>
+            `;
+            
+            // Imagem do QR code
+            const image = document.createElement('img');
+            image.src = paymentData.qrCodeImage;
+            image.alt = `QR Code ${method}`;
+            image.onerror = function() {
+                this.style.display = 'none';
+                qrDisplay.innerHTML += '<p class="error">❌ Erro ao carregar a imagem</p>';
+            };
+            qrDisplay.appendChild(image);
+            
+            // Código para copiar
+            const code = method === 'bitcoin' ? 
+                         (paymentData.lightningInvoice || paymentData.bitcoinUri || '') : 
+                         paymentData.pixCode || '';
+            
+            if (code) {
+                qrDisplay.innerHTML += `
+                    <textarea readonly onclick="this.select()">${code}</textarea>
+                    <div>
+                        <small>ID: ${paymentData.paymentId}</small>
+                    </div>
+                `;
+            }
+            
+            container.appendChild(qrDisplay);
+        }
+        
+        // Executar todos os testes
+        function runAllTests() {
+            clearLogs();
+            log('🚀 Iniciando testes completos...');
+            
+            // Executar todos os testes com pequeno intervalo
+            setTimeout(() => testQRCode('bitcoin', 'mock:api'), 100);
+            setTimeout(() => testQRCode('bitcoin', 'mock:fallback'), 600);
+            setTimeout(() => testQRCode('bitcoin', 'mock:error'), 1100);
+            setTimeout(() => testQRCode('pix', 'mock:api'), 1600);
+            setTimeout(() => testQRCode('pix', 'mock:fallback'), 2100);
+            setTimeout(() => testQRCode('pix', 'mock:error'), 2600);
+            
+            setTimeout(() => {
+                log('✅ Testes completos finalizados');
+            }, 3000);
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 Ferramenta de teste inicializada');
+            log('Selecione um teste para começar');
+        });
+    </script>
+</body>
+</html>

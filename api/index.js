@@ -2,6 +2,26 @@
 const https = require('https');
 const path = require('path');
 
+// Importar o módulo de correção PIX/Bitcoin para unificar tratamento
+let pixFixModule;
+try {
+    pixFixModule = require('../pix-fix-based-on-bitcoin');
+    console.log('✅ Módulo de correção PIX/Bitcoin carregado com sucesso');
+} catch (err) {
+    console.error('⚠️ Erro ao carregar módulo de correção PIX/Bitcoin:', err.message);
+    // Fallback inline para caso o módulo não esteja disponível
+    pixFixModule = {
+        createExternalQrCode: (text) => `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`,
+        unifyPaymentData: (data) => {
+            if (!data.qrCodeImage && (data.pixCode || data.lightningInvoice || data.bitcoinUri)) {
+                const text = data.pixCode || data.lightningInvoice || data.bitcoinUri;
+                data.qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`;
+            }
+            return data;
+        }
+    };
+}
+
 // Importar o módulo de geração de QR code com fallback
 let qrCodeGenerator;
 try {
@@ -19,7 +39,7 @@ try {
         console.error('⚠️ Erro ao carregar QR Code Generator:', err.message);
         console.log('⚠️ Usando API externa direta como último recurso');
         qrCodeGenerator = {
-            generateWithLogo: (text) => `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`
+            generateWithLogo: (text) => pixFixModule.createExternalQrCode(text)
         };
     }
 }
@@ -846,28 +866,40 @@ module.exports = async (req, res) => {
             }
 
             // Store payment
-            payments.set(externalId, paymentData);
-
+            payments.set(externalId, paymentData);            // Preparar response data
+            let responseData = {
+                paymentId: externalId,
+                userName: userName,
+                amount: amount,
+                satoshis: paymentMethod === 'bitcoin' ? amount : undefined,
+                uniqueId: uniqueId,
+                method: paymentMethod,
+                qrCodeText: paymentData.lightningInvoice || paymentData.bitcoinUri || paymentData.pixCode,
+                qrCodeImage: paymentData.qrCodeImage,
+                lightningInvoice: paymentData.lightningInvoice,
+                bitcoinUri: paymentData.bitcoinUri,
+                bitcoinAddress: paymentData.bitcoinAddress,
+                pixCode: paymentData.pixCode,
+                source: paymentData.source,
+                createdAt: paymentData.createdAt
+            };
+            
+            // CORREÇÃO: Unificar formato de dados para PIX e Bitcoin usando nossa função
+            try {
+                console.log('🔄 Aplicando tratamento unificado para resposta PIX/Bitcoin');
+                responseData = pixFixModule.unifyPaymentData(responseData);
+                console.log('✅ Dados unificados com sucesso');
+            } catch (unifyError) {
+                console.error('⚠️ Erro ao unificar dados:', unifyError.message);
+                console.log('⚠️ Usando resposta sem unificação');
+                // Não falhar requisição, apenas logar erro
+            }
+            
             // Response in format expected by frontend
             return res.status(200).json({
                 success: true,
-                data: {
-                    paymentId: externalId,
-                    userName: userName,
-                    amount: amount,
-                    satoshis: paymentMethod === 'bitcoin' ? amount : undefined,
-                    uniqueId: uniqueId,
-                    method: paymentMethod,
-                    qrCodeText: paymentData.lightningInvoice || paymentData.bitcoinUri || paymentData.pixCode,
-                    qrCodeImage: paymentData.qrCodeImage,
-                    lightningInvoice: paymentData.lightningInvoice,
-                    bitcoinUri: paymentData.bitcoinUri,
-                    bitcoinAddress: paymentData.bitcoinAddress,
-                    pixCode: paymentData.pixCode,
-                    source: paymentData.source,
-                    createdAt: paymentData.createdAt
-                }
-            });        } catch (error) {
+                data: responseData
+            });} catch (error) {
             console.error('❌ Error generating QR Code:', error.message);
             return res.status(500).json({ 
                 success: false,

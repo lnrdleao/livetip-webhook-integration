@@ -674,20 +674,22 @@ window.addEventListener('DOMContentLoaded', function() {
     setupBitcoinQuickButtons();
     
     // Setup do formulário de pagamento
-    if (paymentForm) {
-        paymentForm.onsubmit = gerarPagamentoLiveTip;
-    }
+    // Certifique-se de que o event listener que chama /generate-qr (definido anteriormente no script)
+    // seja o manipulador de submissão primário.
+    // A linha abaixo que atribui paymentForm.onsubmit foi comentada para evitar
+    // chamadas diretas do cliente para a API LiveTip.
+    // if (paymentForm) {
+    //     paymentForm.onsubmit = gerarPagamentoLiveTip; 
+    // }
     
     // Adicionar event listeners para os métodos de pagamento
     document.querySelectorAll('input[name="paymentMethod"]').forEach(input => {
         input.addEventListener('change', function() {
             updatePaymentInterface(this.value);
-            // Limpar o valor atual do campo amount
             document.getElementById('amount').value = '';
         });
     });
     
-    // Inicializar a interface com o método de pagamento padrão (PIX)
     updatePaymentInterface('pix');
 });
 // --- FIM DA CORREÇÃO FULL STACK ---

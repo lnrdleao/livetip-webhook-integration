@@ -150,6 +150,19 @@ app.post('/create-payment', async (req, res) => {
                     email,
                     externalId
                 });
+                  // Verificar se o QR code já foi gerado pelo LiveTipService
+                if (!liveTipResponse.qrCodeImage) {
+                    try {
+                        console.log('🖼️ Gerando QR Code local para o código PIX da LiveTip...');
+                        liveTipResponse.qrCodeImage = await qrCodeGenerator.generateWithLogo(liveTipResponse.pixCode, 'pix');
+                        console.log('✅ QR Code gerado com sucesso');
+                    } catch (qrError) {
+                        console.error('⚠️ Erro ao gerar QR code no server:', qrError);
+                        // Continuar sem QR code, será mostrada apenas a string do PIX
+                    }
+                } else {
+                    console.log('✅ QR Code já foi gerado pelo LiveTipService');
+                }
                 
                 paymentData = {
                     id: externalId,
@@ -167,7 +180,7 @@ app.post('/create-payment', async (req, res) => {
                     createdAt: new Date()
                 };
 
-                console.log('✅ Pagamento PIX criado via LiveTip API');            } catch (error) {
+                console.log('✅ Pagamento PIX criado via LiveTip API');} catch (error) {
                 console.log('⚠️ LiveTip API falhou, usando fallback local:', error.message);
                 
                 // Fallback: gerar PIX local
@@ -924,15 +937,30 @@ app.post('/generate-qr', async (req, res) => {
                 pixCode: paymentData.pixCode,
                 source: paymentData.source
             }
-        });
-
-    } catch (error) {
+        });    } catch (error) {
         console.error('❌ Erro ao gerar QR Code:', error.message);
-        res.status(500).json({ 
-            success: false,
-            error: 'Erro interno do servidor',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });    }
+        
+        // Mensagens de erro mais específicas para diferentes situações
+        if (error.message && error.message.toLowerCase().includes('sejaefi')) {
+            res.status(500).json({ 
+                success: false,
+                error: 'Erro ao gerar QR Code: Falha na comunicação com o banco SEJAEFI',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        } else if (error.message && error.message.toLowerCase().includes('api')) {
+            res.status(502).json({ 
+                success: false,
+                error: 'Erro ao gerar QR Code: Serviço temporariamente indisponível',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        } else {
+            res.status(500).json({ 
+                success: false,
+                error: 'Erro ao gerar QR Code: Erro interno do servidor ao tentar gerar um pagamento com pix',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    }
 });
 
 // Health check endpoint

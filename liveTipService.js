@@ -88,16 +88,37 @@ class LiveTipService {
 
             if (!pixCodeFromApi || pixCodeFromApi.length < 50) {
                 throw new Error('Código PIX inválido recebido da API');
-            }            // Retornar dados do pagamento com o código PIX da API LiveTip
-            return {
-                success: true,
-                paymentId: paymentData.externalId || `livetip_${Date.now()}`,
-                pixCode: pixCodeFromApi,
-                qrCodeImage: null, // Será gerado pelo QR generator local
-                expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutos
-                liveTipData: { pixCode: pixCodeFromApi },
-                source: 'livetip_api'
-            };
+            }            // Importar QR Code Generator aqui para garantir que ele esteja disponível
+            const QRCodeWithLogo = require('./qrCodeGenerator');
+            const qrCodeGenerator = new QRCodeWithLogo();
+            
+            try {
+                // Gerar QR code do PIX diretamente aqui para evitar problemas no server.js
+                const qrCodeDataUrl = await qrCodeGenerator.generateWithLogo(pixCodeFromApi, 'pix');
+                
+                // Retornar dados do pagamento com o código PIX e QR code da API LiveTip
+                return {
+                    success: true,
+                    paymentId: paymentData.externalId || `livetip_${Date.now()}`,
+                    pixCode: pixCodeFromApi,
+                    qrCodeImage: qrCodeDataUrl, // QR code já gerado
+                    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutos
+                    liveTipData: { pixCode: pixCodeFromApi },
+                    source: 'livetip_api'
+                };
+            } catch (qrError) {
+                console.error('⚠️ Erro ao gerar QR code no LiveTipService:', qrError);
+                // Mesmo com erro no QR, retornamos o código PIX
+                return {
+                    success: true,
+                    paymentId: paymentData.externalId || `livetip_${Date.now()}`,
+                    pixCode: pixCodeFromApi,
+                    qrCodeImage: null, // Será gerado pelo QR generator local como fallback
+                    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutos
+                    liveTipData: { pixCode: pixCodeFromApi },
+                    source: 'livetip_api'
+                };
+            }
 
         } catch (error) {
             console.error('❌ Erro ao criar pagamento PIX:', error);

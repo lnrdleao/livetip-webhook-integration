@@ -99,7 +99,10 @@ function generatePixCode(amount, description, txId) {
 // Call LiveTip API - Endpoint oficial v235 com melhores práticas PIX
 function callLiveTipAPI(paymentMethod, userName, amount, externalId) {
     return new Promise((resolve, reject) => {
-        let payload;        if (paymentMethod === 'pix') {
+        // Usar let em vez de const para o payload, já que ele será reatribuído
+        let payload;
+        
+        if (paymentMethod === 'pix') {
             // Para PIX: formato oficial da API LiveTip v10
             payload = {
                 sender: userName || "usuario_webhook",

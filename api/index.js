@@ -980,21 +980,13 @@ module.exports = async (req, res) => {
         });
     }
     
-    // 404 for unknown routes
-    res.status(404).json({
-        error: 'Route not found',
-        availableRoutes: [
-            'GET /',
-            'GET /control', 
-            'GET /webhook-monitor',
-            'GET /webhook',
-            'POST /webhook',
-            'GET /health',
-            'POST /generate-qr',
-            'GET /payment-status/{paymentId}',
-            'GET /payments',
-            'GET /webhook-logs',
-            'GET /webhook-stats'
-        ]
+    // Se nenhuma rota correspondeu acima, considera como não encontrada
+    console.warn(`⚠️ Rota não encontrada ou método não suportado: ${method} ${url}`);
+    res.status(404).json({ 
+        success: false, 
+        error: 'Recurso não encontrado.', 
+        method: method, 
+        requestedUrl: url 
     });
+    // Não é necessário return explícito aqui, pois é a última instrução do handler.
 };

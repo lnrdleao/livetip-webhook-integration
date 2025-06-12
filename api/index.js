@@ -1,5 +1,28 @@
 // LiveTip API - Production Ready (Based on Working Local Server)
 const https = require('https');
+const path = require('path');
+
+// Importar o módulo de geração de QR code com fallback
+let qrCodeGenerator;
+try {
+    // Tentativa 1: Importar usando caminho relativo padrão
+    qrCodeGenerator = require('../qrCodeGenerator');
+    console.log('✅ QR Code Generator carregado com sucesso (caminho relativo padrão)');
+} catch (e) {
+    try {
+        // Tentativa 2: Importar usando path.join para resolver o caminho
+        const rootDir = path.resolve('./');
+        qrCodeGenerator = require(path.join(rootDir, 'qrCodeGeneratorFallback'));
+        console.log('✅ QR Code Generator Fallback carregado com sucesso');
+    } catch (err) {
+        // Fallback para API externa direta se ambas tentativas falharem
+        console.error('⚠️ Erro ao carregar QR Code Generator:', err.message);
+        console.log('⚠️ Usando API externa direta como último recurso');
+        qrCodeGenerator = {
+            generateWithLogo: (text) => `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`
+        };
+    }
+}
 
 // In-memory storage for payments and webhook logs (in production, use a database)
 const payments = new Map();
@@ -655,11 +678,10 @@ module.exports = async (req, res) => {
                 error: 'Failed to process test webhook'
             });
         }
-    }
-
-    // Payment generation endpoint - based on working server.js
+    }    // Payment generation endpoint - based on working server.js
     if (url === '/generate-qr' && method === 'POST') {
         try {
+            console.log('🔍 Recebida requisição para gerar QR Code');
             const { userName, paymentMethod, amount, uniqueId } = req.body;
             
             if (!userName || !paymentMethod || !amount) {
@@ -715,7 +737,10 @@ module.exports = async (req, res) => {
                 
                 // Try LiveTip API first
                 try {
-                    const result = await callLiveTipAPI(paymentMethod, userName, amount, externalId);
+                    const result = await callLiveTipAPI(paymentMethod, userName, amount, externalId);                      // Gerar QR Code usando nosso módulo com fallback
+                      const qrCodeImage = await qrCodeGenerator.generateWithLogo(result.code, 'pix');
+                      console.log('✅ QR Code PIX gerado com sucesso');
+                      
                       paymentData = {
                         id: externalId,
                         liveTipPaymentId: result.id,
@@ -724,7 +749,8 @@ module.exports = async (req, res) => {
                         amount,
                         status: 'pending',
                         pixCode: result.code,
-                        qrCodeImage: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(result.code)}`,                        source: result.source || 'livetip-api-v10',
+                        qrCodeImage: qrCodeImage,
+                        source: result.source || 'livetip-api-v10',
                         apiVersion: '10',
                         endpoint: '/api/v1/message/10',
                         pixType: result.type || 'emv',
@@ -738,6 +764,9 @@ module.exports = async (req, res) => {
                     
                     // Fallback: generate PIX locally
                     const pixCode = generatePixCode(amount, `Pagamento ${userName}`, externalId);
+                      // Gerar QR Code usando nosso módulo com fallback
+                    const qrCodeImage = await qrCodeGenerator.generateWithLogo(pixCode, 'pix');
+                    console.log('✅ QR Code PIX fallback gerado com sucesso');
                     
                     paymentData = {
                         id: externalId,
@@ -746,7 +775,7 @@ module.exports = async (req, res) => {
                         amount,
                         status: 'pending',
                         pixCode: pixCode,
-                        qrCodeImage: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}`,
+                        qrCodeImage: qrCodeImage,
                         source: 'fallback-local',
                         createdAt: new Date().toISOString()
                     };
@@ -766,6 +795,9 @@ module.exports = async (req, res) => {
                 try {
                     // Try LiveTip API for Bitcoin
                     const result = await callLiveTipAPI(paymentMethod, userName, amount, externalId);
+                      // Gerar QR Code Bitcoin usando nosso módulo com fallback
+                    const qrCodeImage = await qrCodeGenerator.generateWithLogo(result.code, 'bitcoin');
+                    console.log('✅ QR Code Bitcoin gerado com sucesso');
                     
                     paymentData = {
                         id: externalId,
@@ -777,7 +809,7 @@ module.exports = async (req, res) => {
                         uniqueId: uniqueId,
                         status: 'pending',
                         lightningInvoice: result.code,
-                        qrCodeImage: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(result.code)}`,
+                        qrCodeImage: qrCodeImage,
                         source: 'livetip',
                         createdAt: new Date().toISOString()
                     };
@@ -790,6 +822,9 @@ module.exports = async (req, res) => {
                     // Fallback: generate Bitcoin URI locally
                     const bitcoinAddress = 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh';
                     const bitcoinUri = `bitcoin:${bitcoinAddress}?amount=${(amount / 100000000).toFixed(8)}&label=${encodeURIComponent(`Pagamento ${userName}`)}`;
+                      // Gerar QR Code Bitcoin fallback usando nosso módulo com fallback
+                    const qrCodeImage = await qrCodeGenerator.generateWithLogo(bitcoinUri, 'bitcoin');
+                    console.log('✅ QR Code Bitcoin fallback gerado com sucesso');
                     
                     paymentData = {
                         id: externalId,
@@ -801,7 +836,7 @@ module.exports = async (req, res) => {
                         status: 'pending',
                         bitcoinUri: bitcoinUri,
                         bitcoinAddress: bitcoinAddress,
-                        qrCodeImage: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(bitcoinUri)}`,
+                        qrCodeImage: qrCodeImage,
                         source: 'fallback-local',
                         createdAt: new Date().toISOString()
                     };

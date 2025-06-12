@@ -2,6 +2,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api/simple/(.*)",
+      "destination": "/api/index-simple"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/index"
     }

@@ -182,75 +182,81 @@ function callLiveTipAPI(paymentMethod, userName, amount, externalId) {
                 'Content-Type': 'application/json',
                 'Content-Length': Buffer.byteLength(postData)
             },
-            timeout: 15000
+            timeout: 15000 // Aumentado para 15 segundos para maior robustez
         };
-          const request = https.request(options, (response) => {
+
+        const request = https.request(options, (response) => {
             let data = '';
             response.on('data', (chunk) => { data += chunk; });
             response.on('end', () => {
-                console.log(`📥 Resposta da API LiveTip v10 (${response.statusCode}):`, data.substring(0, 200));
+                console.log(`📥 Resposta da API LiveTip v10 (${response.statusCode}) for ${paymentMethod}:`, data.substring(0, 250)); // Log aumentado
                 
-                // Validação robusta de resposta
                 if (response.statusCode !== 200 && response.statusCode !== 201) {
-                    console.log(`⚠️ Status HTTP inválido: ${response.statusCode}`);
-                    reject(new Error(`HTTP ${response.statusCode}: ${data}`));
+                    console.error(`⚠️ Status HTTP inválido da LiveTip API: ${response.statusCode}. Data: ${data.substring(0,300)}`);
+                    reject(new Error(`LiveTip API request failed with HTTP status ${response.statusCode}: ${data.substring(0,250)}`));
                     return;
                 }
                 
-                // Detecção de resposta HTML (erro do servidor)
                 if (data.trim().startsWith('<') || data.includes('<!DOCTYPE') || data.includes('<html>')) {
-                    console.log('⚠️ API retornou HTML (erro do servidor)');
-                    reject(new Error('API returned HTML error page'));
+                    console.error('⚠️ LiveTip API retornou uma página HTML (provável erro). Data: ${data.substring(0,300)}');
+                    reject(new Error('LiveTip API returned an HTML error page instead of expected data.'));
                     return;
                 }
-                
-                try {
-                    // Tentar parsear como JSON (formato preferido)
-                    const parsed = JSON.parse(data);
-                    
-                    if (parsed.code && typeof parsed.code === 'string' && parsed.code.length > 20) {
-                        // Validação específica para PIX
-                        if (paymentMethod === 'pix') {
-                            if (parsed.code.includes('BR.GOV.BCB.PIX') || parsed.code.startsWith('00020126')) {
-                                console.log('✅ Código PIX válido recebido (formato EMV)');                                resolve({ 
-                                    code: parsed.code, 
-                                    id: parsed.id || externalId,
-                                    type: 'pix_emv',
-                                    source: 'livetip_api_v10'
-                                });
-                            } else {
-                                console.log('⚠️ Código PIX inválido (formato não EMV)');
-                                reject(new Error('Invalid PIX EMV format'));
-                            }
-                        } else {
-                            // Bitcoin/Lightning
-                            console.log('✅ Código de pagamento recebido');                            resolve({ 
-                                code: parsed.code, 
-                                id: parsed.id || externalId,
-                                type: 'lightning',
-                                source: 'livetip_api_v10'
-                            });
-                        }
-                    } else {
-                        console.log('⚠️ JSON sem código válido:', parsed);
-                        reject(new Error('Response missing valid payment code'));
-                    }
-                    
-                } catch (jsonError) {
-                    // Fallback: verificar se é código direto (texto puro)
+
+                if (paymentMethod === 'pix') {
                     const cleanData = data.trim();
-                    
-                    if (paymentMethod === 'pix' && cleanData.length > 50 && 
-                        (cleanData.startsWith('00020126') || cleanData.includes('BR.GOV.BCB.PIX'))) {
-                        console.log('✅ Código PIX direto recebido (texto puro)');                        resolve({ 
+                    // Stricter check for plain text PIX code. This is the *only* expected success format for PIX.
+                    if (cleanData.length > 50 && cleanData.startsWith('00020126') && cleanData.includes('BR.GOV.BCB.PIX')) {
+                        console.log('✅ Código PIX direto (texto puro) recebido da LiveTip API (strict check).');
+                        resolve({ 
                             code: cleanData, 
                             id: externalId,
                             type: 'pix_emv',
-                            source: 'livetip_api_v10_text'
+                            source: 'livetip_api_v10_text_strict'
                         });
                     } else {
-                        console.log('⚠️ Formato de resposta inválido:', jsonError.message);
-                        reject(new Error(`Invalid response format: ${jsonError.message}`));
+                        // If not the expected plain text format, it's an error.
+                        console.error('⚠️ LiveTip API (PIX): Resposta não é um código PIX em texto puro válido como esperado. Status:', response.statusCode, 'Data (primeiros 300 chars):', data.substring(0,300));
+                        reject(new Error('LiveTip API (PIX) response was not a valid plain text PIX code.'));
+                    }
+                } else if (paymentMethod === 'bitcoin') { // Explicitly 'bitcoin' for this JSON structure
+                    try {
+                        const parsed = JSON.parse(data);
+                        // For Bitcoin, expect 'code' field with the lightning invoice
+                        if (parsed.code && typeof parsed.code === 'string' && parsed.code.toLowerCase().startsWith('lnbc')) {
+                            console.log('✅ Código de pagamento (Bitcoin/Lightning) recebido da LiveTip API (JSON).');
+                            resolve({ 
+                                code: parsed.code, 
+                                id: parsed.id || externalId,
+                                type: 'lightning', // Specific type for Bitcoin
+                                source: 'livetip_api_v10_json_bitcoin'
+                            });
+                        } else {
+                            console.error(`⚠️ LiveTip API (Bitcoin): Resposta JSON sem campo 'code' válido (esperado invoice lnbc...). Parsed:`, JSON.stringify(parsed).substring(0,200), 'Original Data (primeiros 300 chars):', data.substring(0,300));
+                            reject(new Error('LiveTip API (Bitcoin) response JSON missing valid Lightning invoice in "code" field.'));
+                        }
+                    } catch (jsonError) {
+                        console.error(`⚠️ LiveTip API (Bitcoin): Falha ao parsear resposta JSON. Data (primeiros 300 chars):`, data.substring(0,300), 'Error:', jsonError.message);
+                        reject(new Error(`LiveTip API (Bitcoin) returned non-JSON or malformed JSON response: ${jsonError.message}`));
+                    }
+                } else { // Fallback for any other (future?) payment methods if they also expect JSON
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.code && typeof parsed.code === 'string' && parsed.code.length > 20) { 
+                            console.log(`✅ Código de pagamento (${paymentMethod}) recebido da LiveTip API (JSON).`);
+                            resolve({ 
+                                code: parsed.code, 
+                                id: parsed.id || externalId,
+                                type: `unknown_json_code_${paymentMethod}`,
+                                source: 'livetip_api_v10_json_other'
+                            });
+                        } else {
+                            console.error(`⚠️ LiveTip API (${paymentMethod}): Resposta JSON sem campo 'code' válido. Parsed:`, JSON.stringify(parsed).substring(0,200), 'Original Data (primeiros 300 chars):', data.substring(0,300));
+                            reject(new Error(`LiveTip API response (${paymentMethod}) missing valid payment code in JSON.`));
+                        }
+                    } catch (jsonError) {
+                        console.error(`⚠️ LiveTip API (${paymentMethod}): Falha ao parsear resposta JSON. Data (primeiros 300 chars):`, data.substring(0,300), 'Error:', jsonError.message);
+                        reject(new Error(`LiveTip API (${paymentMethod}) returned non-JSON or malformed JSON response: ${jsonError.message}`));
                     }
                 }
             });

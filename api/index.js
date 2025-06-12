@@ -189,23 +189,22 @@ function callLiveTipAPI(paymentMethod, userName, amount, externalId) {
             let data = '';
             response.on('data', (chunk) => { data += chunk; });
             response.on('end', () => {
-                console.log(`📥 Resposta da API LiveTip v10 (${response.statusCode}) for ${paymentMethod}:`, data.substring(0, 250)); // Log aumentado
-                
+                console.log(`📥 Resposta da API LiveTip v10 (${response.statusCode}) for ${paymentMethod}:\`, data.substring(0, 300));
+
                 if (response.statusCode !== 200 && response.statusCode !== 201) {
                     console.error(`⚠️ Status HTTP inválido da LiveTip API: ${response.statusCode}. Data: ${data.substring(0,300)}`);
-                    reject(new Error(`LiveTip API request failed with HTTP status ${response.statusCode}: ${data.substring(0,250)}`));
+                    reject(new Error(`Erro da API LiveTip. Status: ${response.statusCode}. Resposta: ${data.substring(0,100)}`));
                     return;
                 }
                 
                 if (data.trim().startsWith('<') || data.includes('<!DOCTYPE') || data.includes('<html>')) {
-                    console.error('⚠️ LiveTip API retornou uma página HTML (provável erro). Data: ${data.substring(0,300)}');
-                    reject(new Error('LiveTip API returned an HTML error page instead of expected data.'));
+                    console.error(`⚠️ LiveTip API retornou uma página HTML (provável erro). Data: ${data.substring(0,300)}`);
+                    reject(new Error('A API LiveTip retornou uma página de erro HTML.'));
                     return;
                 }
 
                 if (paymentMethod === 'pix') {
                     const cleanData = data.trim();
-                    // Stricter check for plain text PIX code. This is the *only* expected success format for PIX.
                     if (cleanData.length > 50 && cleanData.startsWith('00020126') && cleanData.includes('BR.GOV.BCB.PIX')) {
                         console.log('✅ Código PIX direto (texto puro) recebido da LiveTip API (strict check).');
                         resolve({ 
@@ -215,31 +214,29 @@ function callLiveTipAPI(paymentMethod, userName, amount, externalId) {
                             source: 'livetip_api_v10_text_strict'
                         });
                     } else {
-                        // If not the expected plain text format, it's an error.
                         console.error('⚠️ LiveTip API (PIX): Resposta não é um código PIX em texto puro válido como esperado. Status:', response.statusCode, 'Data (primeiros 300 chars):', data.substring(0,300));
-                        reject(new Error('LiveTip API (PIX) response was not a valid plain text PIX code.'));
+                        reject(new Error('API LiveTip (PIX) retornou dados inválidos para o código PIX.'));
                     }
-                } else if (paymentMethod === 'bitcoin') { // Explicitly 'bitcoin' for this JSON structure
+                } else if (paymentMethod === 'bitcoin') {
                     try {
                         const parsed = JSON.parse(data);
-                        // For Bitcoin, expect 'code' field with the lightning invoice
                         if (parsed.code && typeof parsed.code === 'string' && parsed.code.toLowerCase().startsWith('lnbc')) {
                             console.log('✅ Código de pagamento (Bitcoin/Lightning) recebido da LiveTip API (JSON).');
                             resolve({ 
                                 code: parsed.code, 
                                 id: parsed.id || externalId,
-                                type: 'lightning', // Specific type for Bitcoin
+                                type: 'lightning',
                                 source: 'livetip_api_v10_json_bitcoin'
                             });
                         } else {
-                            console.error(`⚠️ LiveTip API (Bitcoin): Resposta JSON sem campo 'code' válido (esperado invoice lnbc...). Parsed:`, JSON.stringify(parsed).substring(0,200), 'Original Data (primeiros 300 chars):', data.substring(0,300));
-                            reject(new Error('LiveTip API (Bitcoin) response JSON missing valid Lightning invoice in "code" field.'));
+                            console.error(`⚠️ LiveTip API (Bitcoin): Resposta JSON sem campo \\\'code\\\' válido (esperado invoice lnbc...). Parsed:`, JSON.stringify(parsed).substring(0,200), 'Original Data (primeiros 300 chars):', data.substring(0,300));
+                            reject(new Error('API LiveTip (Bitcoin) retornou JSON sem invoice válida.'));
                         }
                     } catch (jsonError) {
                         console.error(`⚠️ LiveTip API (Bitcoin): Falha ao parsear resposta JSON. Data (primeiros 300 chars):`, data.substring(0,300), 'Error:', jsonError.message);
-                        reject(new Error(`LiveTip API (Bitcoin) returned non-JSON or malformed JSON response: ${jsonError.message}`));
+                        reject(new Error('API LiveTip (Bitcoin) retornou resposta não-JSON ou malformada.'));
                     }
-                } else { // Fallback for any other (future?) payment methods if they also expect JSON
+                } else { 
                     try {
                         const parsed = JSON.parse(data);
                         if (parsed.code && typeof parsed.code === 'string' && parsed.code.length > 20) { 
@@ -251,26 +248,26 @@ function callLiveTipAPI(paymentMethod, userName, amount, externalId) {
                                 source: 'livetip_api_v10_json_other'
                             });
                         } else {
-                            console.error(`⚠️ LiveTip API (${paymentMethod}): Resposta JSON sem campo 'code' válido. Parsed:`, JSON.stringify(parsed).substring(0,200), 'Original Data (primeiros 300 chars):', data.substring(0,300));
-                            reject(new Error(`LiveTip API response (${paymentMethod}) missing valid payment code in JSON.`));
+                            console.error(`⚠️ LiveTip API (${paymentMethod}): Resposta JSON sem campo \\\'code\\\' válido. Parsed:`, JSON.stringify(parsed).substring(0,200), 'Original Data (primeiros 300 chars):', data.substring(0,300));
+                            reject(new Error(`API LiveTip (${paymentMethod}) retornou JSON sem código de pagamento válido.`));
                         }
                     } catch (jsonError) {
                         console.error(`⚠️ LiveTip API (${paymentMethod}): Falha ao parsear resposta JSON. Data (primeiros 300 chars):`, data.substring(0,300), 'Error:', jsonError.message);
-                        reject(new Error(`LiveTip API (${paymentMethod}) returned non-JSON or malformed JSON response: ${jsonError.message}`));
+                        reject(new Error(`API LiveTip (${paymentMethod}) retornou resposta não-JSON ou malformada.`));
                     }
                 }
             });
         });
         
         request.on('timeout', () => {
-            console.log('⏰ Timeout da API LiveTip');
-            request.destroy();
-            reject(new Error('Request timeout'));
+            console.error('⏰ Timeout da API LiveTip');
+            request.destroy(); 
+            reject(new Error('Timeout ao conectar com a API LiveTip.'));
         });
         
         request.on('error', (error) => {
-            console.log('❌ Erro na requisição LiveTip:', error.message);
-            reject(error);
+            console.error('❌ Erro na requisição LiveTip:', error.message);
+            reject(new Error('Erro de conexão com a API LiveTip: ' + error.message));
         });
         
         request.write(postData);
@@ -855,11 +852,9 @@ module.exports = async (req, res) => {
                     console.log('✅ PIX payment created via LiveTip API v10 (Official Endpoint)');
 
                 } catch (apiError) {
-                    console.log('⚠️ LiveTip API failed, using PIX fallback:', apiError.message);
+                    console.error('⚠️ LiveTip API falhou para PIX, usando fallback local:', apiError.message); 
                     
-                    // Fallback: generate PIX locally
                     const pixCode = generatePixCode(amount, `Pagamento ${userName}`, externalId);
-                      // Gerar QR Code usando nosso módulo com fallback
                     const qrCodeImage = await qrCodeGenerator.generateWithLogo(pixCode, 'pix');
                     console.log('✅ QR Code PIX fallback gerado com sucesso');
                     
@@ -871,11 +866,12 @@ module.exports = async (req, res) => {
                         status: 'pending',
                         pixCode: pixCode,
                         qrCodeImage: qrCodeImage,
-                        source: 'fallback-local',
+                        source: 'fallback-local-devido-a-erro-api', 
+                        errorApiMessage: apiError.message, 
                         createdAt: new Date().toISOString()
                     };
 
-                    console.log('✅ PIX payment created locally');
+                    console.log('✅ PIX payment created locally (fallback due to API error)');
                 }
 
             } else if (paymentMethod === 'bitcoin') {
@@ -896,90 +892,52 @@ module.exports = async (req, res) => {
                     
                     paymentData = {
                         id: externalId,
-                        liveTipPaymentId: result.id,
+                        liveTipPaymentId: result.id, 
                         userName,
                         method: 'bitcoin',
-                        amount,
-                        satoshis: amount,
-                        uniqueId: uniqueId,
+                        amount, 
                         status: 'pending',
                         lightningInvoice: result.code,
                         qrCodeImage: qrCodeImage,
-                        source: 'livetip',
+                        source: result.source || 'livetip-api-v10',
+                        apiVersion: '10',
+                        endpoint: '/api/v1/message/10',
                         createdAt: new Date().toISOString()
                     };
-
-                    console.log(`✅ Bitcoin payment created via LiveTip API - ${amount} satoshis - ID: ${uniqueId}`);
+                    console.log('✅ Bitcoin payment created via LiveTip API v10 (Official Endpoint)');
 
                 } catch (apiError) {
-                    console.log('⚠️ LiveTip API failed, using Bitcoin fallback:', apiError.message);
-                    
-                    // Fallback: generate Bitcoin URI locally
-                    const bitcoinAddress = 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh';
-                    const bitcoinUri = `bitcoin:${bitcoinAddress}?amount=${(amount / 100000000).toFixed(8)}&label=${encodeURIComponent(`Pagamento ${userName}`)}`;
-                      // Gerar QR Code Bitcoin fallback usando nosso módulo com fallback
-                    const qrCodeImage = await qrCodeGenerator.generateWithLogo(bitcoinUri, 'bitcoin');
-                    console.log('✅ QR Code Bitcoin fallback gerado com sucesso');
-                    
-                    paymentData = {
-                        id: externalId,
-                        userName,
-                        method: 'bitcoin',
-                        amount,
-                        satoshis: amount,
-                        uniqueId: uniqueId,
-                        status: 'pending',
-                        bitcoinUri: bitcoinUri,
-                        bitcoinAddress: bitcoinAddress,
-                        qrCodeImage: qrCodeImage,
-                        source: 'fallback-local',
-                        createdAt: new Date().toISOString()
-                    };
-
-                    console.log(`✅ Bitcoin payment created locally - ${amount} satoshis - ID: ${uniqueId}`);
+                    console.error('⚠️ LiveTip API falhou para Bitcoin:', apiError.message);
+                    return res.status(503).json({ 
+                        success: false,
+                        error: 'Erro ao conectar com a API LiveTip para gerar pagamento Bitcoin.',
+                        details: apiError.message 
+                    });
                 }
+            } else {
+                console.error('❌ Método de pagamento desconhecido:', paymentMethod);
+                return res.status(400).json({ 
+                    success: false,
+                    error: 'Método de pagamento desconhecido' 
+                });
             }
 
-            // Store payment
-            payments.set(externalId, paymentData);            // Preparar response data
-            let responseData = {
-                paymentId: externalId,
-                userName: userName,
-                amount: amount,
-                satoshis: paymentMethod === 'bitcoin' ? amount : undefined,
-                uniqueId: uniqueId,
-                method: paymentMethod,
-                qrCodeText: paymentData.lightningInvoice || paymentData.bitcoinUri || paymentData.pixCode,
-                qrCodeImage: paymentData.qrCodeImage,
-                lightningInvoice: paymentData.lightningInvoice,
-                bitcoinUri: paymentData.bitcoinUri,
-                bitcoinAddress: paymentData.bitcoinAddress,
-                pixCode: paymentData.pixCode,
-                source: paymentData.source,
-                createdAt: paymentData.createdAt
-            };
-            
-            // CORREÇÃO: Unificar formato de dados para PIX e Bitcoin usando nossa função
-            try {
-                console.log('🔄 Aplicando tratamento unificado para resposta PIX/Bitcoin');
-                responseData = pixFixModule.unifyPaymentData(responseData);
-                console.log('✅ Dados unificados com sucesso');
-            } catch (unifyError) {
-                console.error('⚠️ Erro ao unificar dados:', unifyError.message);
-                console.log('⚠️ Usando resposta sem unificação');
-                // Não falhar requisição, apenas logar erro
+            if (paymentData) {
+                payments.set(externalId, paymentData);
+                console.log('💾 Pagamento armazenado localmente:', paymentData.id);
+
+                return res.status(200).json({ 
+                    success: true, 
+                    payment: paymentData 
+                });
             }
-            
-            // Response in format expected by frontend
-            return res.status(200).json({
-                success: true,
-                data: responseData
-            });} catch (error) {
-            console.error('❌ Error generating QR Code:', error.message);
+
+        } catch (error) {
+            console.error('❌ Erro crítico em /generate-qr:', error.message, error.stack);
             return res.status(500).json({ 
-                success: false,
-                error: 'Erro interno do servidor',
-                details: error.message
+                success: false, 
+                error: 'Erro interno do servidor ao gerar QR code.',
+                details: error.message 
             });
         }
     }

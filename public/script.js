@@ -27,15 +27,17 @@ const loading = document.getElementById('loading');
 // Gerar identificador único para Bitcoin
 function generateUniqueId() {
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    return `BTC_${timestamp}_${random}`.toUpperCase();
+    const random = Math.random().toString(36).substring(2, 10);
+    const checksum = (timestamp % 97).toString().padStart(2, '0');
+    return `BTC_${timestamp}_${random}_${checksum}`.toUpperCase();
 }
 
 // Gerar identificador único para PIX
 function generatePixUniqueId() {
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    return `PIX_${timestamp}_${random}`.toUpperCase();
+    const random = Math.random().toString(36).substring(2, 10);
+    const checksum = (timestamp % 97).toString().padStart(2, '0');
+    return `PIX_${timestamp}_${random}_${checksum}`.toUpperCase();
 }
 
 // Atualizar interface baseada no método de pagamento
@@ -46,6 +48,11 @@ function updatePaymentInterface(paymentMethod) {
     const pixValues = document.getElementById('pixValues');
     const uniqueIdGroup = document.getElementById('uniqueIdGroup');
     const uniqueIdInput = document.getElementById('uniqueId');
+    
+    // Limpar seleções anteriores de botões
+    document.querySelectorAll('.pix-btn, .satoshi-btn').forEach(btn => {
+        btn.classList.remove('active', 'selected');
+    });
     
     if (paymentMethod === 'bitcoin') {
         uniqueIdGroup.style.display = 'block';
@@ -110,6 +117,13 @@ paymentForm.addEventListener('submit', async (e) => {
         return;
     }
     
+    // Verificar se o ID único foi gerado corretamente
+    if (!currentUniqueId) {
+        // Gerar um novo ID caso não exista
+        currentUniqueId = paymentMethod === 'bitcoin' ? generateUniqueId() : generatePixUniqueId();
+        document.getElementById('uniqueId').value = currentUniqueId;
+    }
+    
     try {
         showLoading(true);
         
@@ -134,18 +148,25 @@ paymentForm.addEventListener('submit', async (e) => {
             
             // Exibir resultado com os dados tratados
             displayPaymentResult(responseData);
-            
-            // Salvar no histórico local para Bitcoin e PIX
+              // Salvar no histórico local para Bitcoin e PIX
             if (paymentMethod === 'bitcoin' || paymentMethod === 'pix') {
+                // Verificar uma última vez se temos um ID único válido
+                const uniqueId = currentUniqueId || (paymentMethod === 'bitcoin' ? 
+                    generateUniqueId() : generatePixUniqueId());
+                    
                 saveToLocalHistory({
                     id: currentPaymentId,
-                    uniqueId: currentUniqueId,
+                    uniqueId: uniqueId,
                     userName: data.userName,
                     amount: amount,
                     status: 'pending',
                     timestamp: new Date().toISOString(),
-                    method: paymentMethod
+                    method: paymentMethod,
+                    createdAt: new Date().toISOString()
                 });
+                
+                // Atualizar o campo de ID único na interface
+                document.getElementById('uniqueId').value = uniqueId;
             }
         } else {
             alert('Erro ao gerar QR Code: ' + result.error);
@@ -562,19 +583,111 @@ function copyToClipboard(text, message) {
     alert(message);
 }
 
-// Inicialização
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar evento de mudança do método de pagamento
-    const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
-    paymentMethodRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
+// --- INÍCIO DA CORREÇÃO FULL STACK ---
+
+// Função para preencher valor ao clicar nos botões rápidos PIX
+function setupPixQuickButtons() {
+    document.querySelectorAll('.pix-btn').forEach(btn => {
+        btn.onclick = function() {
+            // Remover classe active de todos os botões PIX
+            document.querySelectorAll('.pix-btn').forEach(b => b.classList.remove('active'));
+            
+            // Adicionar classe active ao botão clicado
+            this.classList.add('active');
+            
+            // Preencher o valor no campo
+            const value = this.getAttribute('data-pix');
+            document.getElementById('amount').value = value;
+        };
+    });
+}
+
+// Função para preencher valor ao clicar nos botões rápidos Bitcoin
+function setupBitcoinQuickButtons() {
+    document.querySelectorAll('.satoshi-btn').forEach(btn => {
+        btn.onclick = function() {
+            // Remover classe active de todos os botões Bitcoin
+            document.querySelectorAll('.satoshi-btn').forEach(b => b.classList.remove('active'));
+            
+            // Adicionar classe active ao botão clicado
+            this.classList.add('active');
+            
+            // Preencher o valor no campo
+            const value = this.getAttribute('data-sats');
+            document.getElementById('amount').value = value;
+        };
+    });
+}
+
+// Função para gerar pagamento via LiveTip API
+async function gerarPagamentoLiveTip(event) {
+    event.preventDefault();
+    const userName = document.getElementById('userName').value;
+    const amount = document.getElementById('amount').value;
+    const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+    if (!userName || !amount) {
+        alert('Preencha todos os campos!');
+        return;
+    }
+    
+    // Monta o body conforme a documentação oficial
+    const body = {
+        sender: userName,
+        content: 'Pagamento gerado via LiveTip',
+        currency: paymentMethod === 'pix' ? 'BRL' : 'BTC',
+        amount: amount
+    };
+    
+    // Chama o endpoint oficial
+    const endpoint = 'https://api.livetip.gg/api/v1/message/10';
+    document.getElementById('loading').style.display = 'block';
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        document.getElementById('loading').style.display = 'none';
+        if (data && data.qr_code) {
+            // Exibe o QR code retornado
+            document.getElementById('qrCodeSection').style.display = 'block';
+            document.getElementById('qrCodeImage').src = data.qr_code;
+            document.getElementById('paymentMethodTitle').textContent = paymentMethod === 'pix' ? '🏦 PIX' : '₿ Bitcoin';
+            document.getElementById('paymentUserName').textContent = userName;
+            document.getElementById('paymentAmount').textContent = amount;
+            document.getElementById('paymentStatus').textContent = 'Aguardando pagamento';
+            document.getElementById('paymentDetails').innerHTML = '';
+        } else {
+            alert('Erro ao gerar pagamento: ' + (data.error || 'Resposta inesperada da API.'));
+        }
+    } catch (err) {
+        document.getElementById('loading').style.display = 'none';
+        alert('Erro ao conectar com a API LiveTip.');
+    }
+}
+
+// Setup inicial ao carregar a página
+window.addEventListener('DOMContentLoaded', function() {
+    // Setup dos botões de valores predefinidos
+    setupPixQuickButtons();
+    setupBitcoinQuickButtons();
+    
+    // Setup do formulário de pagamento
+    if (paymentForm) {
+        paymentForm.onsubmit = gerarPagamentoLiveTip;
+    }
+    
+    // Adicionar event listeners para os métodos de pagamento
+    document.querySelectorAll('input[name="paymentMethod"]').forEach(input => {
+        input.addEventListener('change', function() {
             updatePaymentInterface(this.value);
+            // Limpar o valor atual do campo amount
+            document.getElementById('amount').value = '';
         });
     });
     
-    // Inicializar com o método selecionado
-    const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked');
-    if (selectedMethod) {
-        updatePaymentInterface(selectedMethod.value);
-    }
+    // Inicializar a interface com o método de pagamento padrão (PIX)
+    updatePaymentInterface('pix');
 });
+// --- FIM DA CORREÇÃO FULL STACK ---

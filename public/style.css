@@ -304,7 +304,7 @@ header p {
     transform: translateY(0);
 }
 
-.satoshi-btn.selected {
+.satoshi-btn.selected, .satoshi-btn.active {
     background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
     box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
 }
@@ -527,7 +527,7 @@ header p {
     transform: translateY(0);
 }
 
-.pix-btn.selected {
+.pix-btn.selected, .pix-btn.active {
     background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
     box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
 }
